@@ -109,11 +109,6 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
 
       let new_tail = [#(wrapped_x, wrapped_y), ..model.tail]
-      let new_tail = case list.length(new_tail) > 50 {
-        True -> list.take(new_tail, 50)
-        False -> new_tail
-      }
-
       Model(..model, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
     }
 
