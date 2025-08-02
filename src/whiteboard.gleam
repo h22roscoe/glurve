@@ -13,7 +13,7 @@ import lustre/server_component
 
 const speed = 1.0
 
-const turn_rate = 0.15
+const turn_rate = 0.05
 
 const width = 500
 
