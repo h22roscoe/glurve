@@ -1,3 +1,4 @@
+import game
 import gleam/bytes_tree
 import gleam/erlang/application
 import gleam/erlang/process.{type Selector, type Subject}
@@ -11,20 +12,19 @@ import lustre/element
 import lustre/element/html.{html}
 import lustre/server_component
 import mist.{type Connection, type ResponseData}
-import whiteboard
 
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
-  let whiteboard = whiteboard.component()
-  let assert Ok(component) = lustre.start_server_component(whiteboard, Nil)
+  let game = game.component()
+  let assert Ok(component) = lustre.start_server_component(game, Nil)
 
   let assert Ok(_) =
     fn(request: Request(Connection)) -> Response(ResponseData) {
       case request.path_segments(request) {
         [] -> serve_html()
         ["lustre", "runtime.mjs"] -> serve_runtime()
-        ["ws"] -> serve_whiteboard(request, component)
+        ["ws"] -> serve_game(request, component)
         _ -> response.set_body(response.new(404), mist.Bytes(bytes_tree.new()))
       }
     }
@@ -85,49 +85,46 @@ fn serve_runtime() -> Response(ResponseData) {
 
 // WEBSOCKET -------------------------------------------------------------------
 
-fn serve_whiteboard(
+fn serve_game(
   request: Request(Connection),
-  component: lustre.Runtime(whiteboard.Msg),
+  component: lustre.Runtime(game.Msg),
 ) -> Response(ResponseData) {
   mist.websocket(
     request:,
-    on_init: init_whiteboard_socket(_, component),
-    handler: loop_whiteboard_socket,
-    on_close: close_whiteboard_socket,
+    on_init: init_game_socket(_, component),
+    handler: loop_game_socket,
+    on_close: close_game_socket,
   )
 }
 
-type WhiteboardSocket {
-  WhiteboardSocket(
-    component: lustre.Runtime(whiteboard.Msg),
-    self: Subject(server_component.ClientMessage(whiteboard.Msg)),
+type GameSocket {
+  GameSocket(
+    component: lustre.Runtime(game.Msg),
+    self: Subject(server_component.ClientMessage(game.Msg)),
   )
 }
 
-type WhiteboardSocketMessage =
-  server_component.ClientMessage(whiteboard.Msg)
+type GameSocketMessage =
+  server_component.ClientMessage(game.Msg)
 
-type WhiteboardSocketInit =
-  #(WhiteboardSocket, Option(Selector(WhiteboardSocketMessage)))
+type GameSocketInit =
+  #(GameSocket, Option(Selector(GameSocketMessage)))
 
-fn init_whiteboard_socket(
-  _,
-  component: lustre.Runtime(whiteboard.Msg),
-) -> WhiteboardSocketInit {
+fn init_game_socket(_, component: lustre.Runtime(game.Msg)) -> GameSocketInit {
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)
 
   server_component.register_subject(self)
   |> lustre.send(to: component)
 
-  #(WhiteboardSocket(component:, self:), Some(selector))
+  #(GameSocket(component:, self:), Some(selector))
 }
 
-fn loop_whiteboard_socket(
-  state: WhiteboardSocket,
-  message: mist.WebsocketMessage(WhiteboardSocketMessage),
+fn loop_game_socket(
+  state: GameSocket,
+  message: mist.WebsocketMessage(GameSocketMessage),
   connection: mist.WebsocketConnection,
-) -> mist.Next(WhiteboardSocket, WhiteboardSocketMessage) {
+) -> mist.Next(GameSocket, GameSocketMessage) {
   case message {
     mist.Text(json) -> {
       case json.parse(json, server_component.runtime_message_decoder()) {
@@ -158,7 +155,7 @@ fn loop_whiteboard_socket(
   }
 }
 
-fn close_whiteboard_socket(state: WhiteboardSocket) -> Nil {
+fn close_game_socket(state: GameSocket) -> Nil {
   server_component.deregister_subject(state.self)
   |> lustre.send(to: state.component)
 }
