@@ -32,12 +32,19 @@ pub fn component() -> App(Nil, Model, Msg) {
 // ---
 pub type Model {
   Model(
+    game_state: GameState,
     x: Float,
     y: Float,
     angle: Float,
     tail: List(#(Float, Float)),
     turning: TurnDirection,
   )
+}
+
+pub type GameState {
+  NotStarted
+  Playing
+  Ended
 }
 
 pub type TurnDirection {
@@ -55,32 +62,43 @@ fn apply_interval(
 ) -> Result(TimerID, String)
 
 fn init(_) -> #(Model, Effect(Msg)) {
-  let model = Model(x: 250.0, y: 250.0, angle: 0.0, tail: [], turning: Straight)
-  let tick_effect =
-    effect.from(fn(dispatch) {
-      case apply_interval(10, fn() { dispatch(Tick) }) {
-        Ok(_) -> Nil
-        Error(_) -> {
-          // In a real app, you'd want to log this error!
-          Nil
-        }
-      }
-    })
-  #(model, tick_effect)
+  let model =
+    Model(
+      game_state: NotStarted,
+      x: 250.0,
+      y: 250.0,
+      angle: 0.0,
+      tail: [],
+      turning: Straight,
+    )
+
+  #(model, effect.none())
 }
 
 // ---
 // UPDATE
 // ---
 pub type Msg {
+  StartGame
   Tick
   KeyDown(String)
   KeyUp(String)
   NoOp
 }
 
+fn tick_effect() -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    case apply_interval(10, fn() { dispatch(Tick) }) {
+      Ok(_) -> Nil
+      Error(_) -> Nil
+    }
+  })
+}
+
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   let new_model = case msg {
+    StartGame -> Model(..model, game_state: Playing)
+
     Tick -> {
       let angle = case model.turning {
         Left -> model.angle -. turn_rate
@@ -124,7 +142,14 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     NoOp -> model
   }
 
-  #(new_model, effect.none())
+  case msg {
+    StartGame -> {
+      #(new_model, tick_effect())
+    }
+    _ -> {
+      #(new_model, effect.none())
+    }
+  }
 }
 
 // ---
@@ -178,6 +203,49 @@ fn view(model: Model) -> Element(Msg) {
       #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
     })
 
+  let overlay_elements = case model.game_state {
+    NotStarted -> {
+      let start_button =
+        svg.text(
+          [
+            attribute.attribute("x", "50%"),
+            attribute.attribute("y", "50%"),
+            attribute.attribute("text-anchor", "middle"),
+            attribute.attribute("dominant-baseline", "middle"),
+            attribute.attribute("font-size", "24"),
+            attribute.attribute("font-family", "sans-serif"),
+            attribute.attribute("fill", "black"),
+            attribute.style("cursor", "pointer"),
+            event.on_click(StartGame),
+          ],
+          "Click to Start",
+        )
+      [#("start", start_button)]
+    }
+    Playing -> []
+    Ended -> {
+      let end_text =
+        svg.text(
+          [
+            attribute.attribute("x", "50%"),
+            attribute.attribute("y", "50%"),
+            attribute.attribute("text-anchor", "middle"),
+            attribute.attribute("dominant-baseline", "middle"),
+            attribute.attribute("font-size", "24"),
+            attribute.attribute("font-family", "sans-serif"),
+            attribute.attribute("fill", "black"),
+          ],
+          "Game Over",
+        )
+      [#("end", end_text)]
+    }
+  }
+
+  let svg_children = case model.game_state {
+    NotStarted | Ended -> overlay_elements
+    _ -> [head_keyed, ..tail_points_keyed]
+  }
+
   element.fragment([html.style([], { "
       svg {
         background-color: oklch(98.4% 0.003 247.858);
@@ -190,10 +258,12 @@ fn view(model: Model) -> Element(Msg) {
       "http://www.w3.org/2000/svg",
       "svg",
       [
+        attribute.attribute("width", int.to_string(width)),
+        attribute.attribute("height", int.to_string(height)),
         attribute.tabindex(0),
         server_component.include(on_key_down, ["key"]),
         server_component.include(on_key_up, ["key"]),
       ],
-      [head_keyed, ..tail_points_keyed],
+      svg_children,
     )])
 }
