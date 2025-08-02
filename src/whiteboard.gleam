@@ -7,6 +7,7 @@ import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
+import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
@@ -160,6 +161,23 @@ fn view(model: Model) -> Element(Msg) {
       ])
     })
 
+  let head =
+    svg.circle([
+      attribute.attribute("cx", float.to_string(model.x)),
+      attribute.attribute("cy", float.to_string(model.y)),
+      attribute.attribute("r", "5"),
+      attribute.attribute("fill", "black"),
+    ])
+
+  let head_keyed = #("head", head)
+
+  let tail_points_len = list.length(tail_points)
+  let tail_points_keyed =
+    tail_points
+    |> list.index_map(fn(pos, index) {
+      #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
+    })
+
   element.fragment([html.style([], { "
       svg {
         background-color: oklch(98.4% 0.003 247.858);
@@ -168,20 +186,14 @@ fn view(model: Model) -> Element(Msg) {
         width: " <> int.to_string(width) <> "px;
         height: " <> int.to_string(height) <> "px;
       }
-      " }), html.svg(
+      " }), keyed.namespaced(
+      "http://www.w3.org/2000/svg",
+      "svg",
       [
         attribute.tabindex(0),
         server_component.include(on_key_down, ["key"]),
         server_component.include(on_key_up, ["key"]),
       ],
-      [
-        svg.circle([
-          attribute.attribute("cx", float.to_string(model.x)),
-          attribute.attribute("cy", float.to_string(model.y)),
-          attribute.attribute("r", "5"),
-          attribute.attribute("fill", "black"),
-        ]),
-        ..tail_points
-      ],
+      [head_keyed, ..tail_points_keyed],
     )])
 }
