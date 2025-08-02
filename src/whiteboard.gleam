@@ -11,9 +11,9 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 
-const speed = 4.0
+const speed = 1.0
 
-const turn_rate = 0.1
+const turn_rate = 0.15
 
 const width = 500
 
@@ -57,7 +57,7 @@ fn init(_) -> #(Model, Effect(Msg)) {
   let model = Model(x: 250.0, y: 250.0, angle: 0.0, tail: [], turning: Straight)
   let tick_effect =
     effect.from(fn(dispatch) {
-      case apply_interval(50, fn() { dispatch(Tick) }) {
+      case apply_interval(10, fn() { dispatch(Tick) }) {
         Ok(_) -> Nil
         Error(_) -> {
           // In a real app, you'd want to log this error!
