@@ -12,6 +12,12 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 
+const tick_delay_ms = 10
+
+const head_radius = 5.0
+
+const tail_radius = 3.0
+
 const speed = 1.0
 
 const turn_rate = 0.05
@@ -88,11 +94,28 @@ pub type Msg {
 
 fn tick_effect() -> Effect(Msg) {
   effect.from(fn(dispatch) {
-    case apply_interval(10, fn() { dispatch(Tick) }) {
+    case apply_interval(tick_delay_ms, fn() { dispatch(Tick) }) {
       Ok(_) -> Nil
       Error(_) -> Nil
     }
   })
+}
+
+fn check_collision(model: Model) -> Bool {
+  let head_x = model.x
+  let head_y = model.y
+  let collision_distance = head_radius +. tail_radius
+
+  list.any(
+    list.drop(model.tail, float.round(head_radius) * tick_delay_ms),
+    fn(pos) {
+      let #(tail_x, tail_y) = pos
+      let dx = head_x -. tail_x
+      let dy = head_y -. tail_y
+      let distance_squared = dx *. dx +. dy *. dy
+      distance_squared <. collision_distance *. collision_distance
+    },
+  )
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -127,8 +150,14 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
           }
       }
 
-      let new_tail = [#(wrapped_x, wrapped_y), ..model.tail]
-      Model(..model, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+      let new_tail = [#(model.x, model.y), ..model.tail]
+      let new_model =
+        Model(..model, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+
+      case check_collision(new_model) {
+        True -> Model(..new_model, game_state: Ended)
+        False -> new_model
+      }
     }
 
     KeyDown("ArrowLeft") -> Model(..model, turning: Left)
@@ -181,7 +210,7 @@ fn view(model: Model) -> Element(Msg) {
       svg.circle([
         attribute.attribute("cx", float.to_string(x)),
         attribute.attribute("cy", float.to_string(y)),
-        attribute.attribute("r", "3"),
+        attribute.attribute("r", float.to_string(tail_radius)),
         attribute.attribute("fill", "black"),
       ])
     })
@@ -190,7 +219,7 @@ fn view(model: Model) -> Element(Msg) {
     svg.circle([
       attribute.attribute("cx", float.to_string(model.x)),
       attribute.attribute("cy", float.to_string(model.y)),
-      attribute.attribute("r", "5"),
+      attribute.attribute("r", float.to_string(head_radius)),
       attribute.attribute("fill", "black"),
     ])
 
