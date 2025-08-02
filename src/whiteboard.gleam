@@ -104,7 +104,7 @@ fn tick_effect() -> Effect(Msg) {
 fn check_collision(model: Model) -> Bool {
   let head_x = model.x
   let head_y = model.y
-  let collision_distance = head_radius +. tail_radius
+  let collision_distance = tail_radius +. tail_radius
 
   list.any(
     list.drop(model.tail, float.round(head_radius) * tick_delay_ms),
