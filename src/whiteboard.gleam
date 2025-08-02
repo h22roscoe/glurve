@@ -1,183 +1,192 @@
-import gleam/dict.{type Dict}
-import gleam/dynamic/decode
+import gleam/float
 import gleam/int
+import gleam/list
+import gleam_community/maths
 import lustre.{type App}
-import lustre/attribute.{attribute}
+import lustre/attribute
+import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
 
-// MAIN ------------------------------------------------------------------------
+const speed = 4.0
 
-pub fn component() -> App(_, Model, Msg) {
-  lustre.simple(init, update, view)
+const turn_rate = 0.1
+
+const width = 500
+
+const height = 500
+
+// ---
+// MAIN
+// ---
+pub fn component() -> App(Nil, Model, Msg) {
+  lustre.application(init, update, view)
 }
 
-// MODEL -----------------------------------------------------------------------
-
-pub type Color {
-  Blue
-  Red
-  Green
-  Yellow
-}
-
-fn to_string(color: Color) -> String {
-  case color {
-    Red -> "red"
-    Blue -> "blue"
-    Green -> "green"
-    Yellow -> "yellow"
-  }
-}
-
+// ---
+// MODEL
+// ---
 pub type Model {
-  Model(drawn_points: Dict(#(Int, Int), Color), selected_color: Color)
+  Model(
+    x: Float,
+    y: Float,
+    angle: Float,
+    tail: List(#(Float, Float)),
+    turning: TurnDirection,
+  )
 }
 
-fn init(_) -> Model {
-  Model(drawn_points: dict.new(), selected_color: Red)
+pub type TurnDirection {
+  Left
+  Right
+  Straight
 }
 
-// UPDATE ----------------------------------------------------------------------
+type TimerID
 
-pub opaque type Msg {
-  UserDrewCircle(x: Int, y: Int, color: Color)
-  UserChangedColor(color: Color)
-  UserClearedScreen
-}
+@external(erlang, "timer", "apply_interval")
+fn apply_interval(
+  delay_ms: Int,
+  callback: fn() -> any,
+) -> Result(TimerID, String)
 
-fn update(model: Model, msg: Msg) -> Model {
-  case msg {
-    UserDrewCircle(x:, y:, color:) -> {
-      let new_points =
-        model.drawn_points
-        |> dict.insert(#(x, y), color)
-
-      Model(..model, drawn_points: new_points)
-    }
-
-    UserChangedColor(color:) -> {
-      Model(..model, selected_color: color)
-    }
-
-    UserClearedScreen -> {
-      let default_model = init(1)
-      Model(..default_model, selected_color: model.selected_color)
-    }
-  }
-}
-
-// VIEW ------------------------------------------------------------------------
-
-fn view(model: Model) -> Element(Msg) {
-  let on_mouse_move =
-    event.on("mousemove", {
-      use button <- decode.field("buttons", decode.int)
-      use client_x <- decode.field("clientX", decode.int)
-      use client_y <- decode.field("clientY", decode.int)
-
-      case button {
-        1 ->
-          decode.success(UserDrewCircle(
-            x: client_x,
-            y: client_y,
-            color: model.selected_color,
-          ))
-        _ -> decode.failure(UserDrewCircle(x: 0, y: 0, color: Red), "Msg")
+fn init(_) -> #(Model, Effect(Msg)) {
+  let model = Model(x: 250.0, y: 250.0, angle: 0.0, tail: [], turning: Straight)
+  let tick_effect =
+    effect.from(fn(dispatch) {
+      case apply_interval(50, fn() { dispatch(Tick) }) {
+        Ok(_) -> Nil
+        Error(_) -> {
+          // In a real app, you'd want to log this error!
+          Nil
+        }
       }
     })
-    |> server_component.include(["buttons", "clientX", "clientY"])
-    |> event.throttle(5)
+  #(model, tick_effect)
+}
 
-  element.fragment([
-    html.style([], {
-      "
-      #controls {
-        align-items: center;
-        background-color: white;
-        border-radius: 2rem;
-        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-        display: flex;
-        gap: 1rem;
-        left: 1rem;
-        padding: 1rem 1.5rem;
-        position: fixed;
-        bottom: 1rem;
-        z-index: 1;
-        width: max-content;
+// ---
+// UPDATE
+// ---
+pub type Msg {
+  Tick
+  KeyDown(String)
+  KeyUp(String)
+  NoOp
+}
 
-        .colour {
-          border: none;
-          width: 3rem;
-          height: 3rem;
-          border-radius: 50%;
-          display: inline-block;
-        }
-
-        .colour.selected {
-          filter: darken(0.2);
-        }
+fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+  let new_model = case msg {
+    Tick -> {
+      let angle = case model.turning {
+        Left -> model.angle -. turn_rate
+        Right -> model.angle +. turn_rate
+        Straight -> model.angle
       }
 
+      let new_x = model.x +. maths.cos(angle) *. speed
+      let new_y = model.y +. maths.sin(angle) *. speed
+
+      let wrapped_x = case new_x >. int.to_float(width) {
+        True -> 0.0
+        False ->
+          case new_x <. 0.0 {
+            True -> int.to_float(width)
+            False -> new_x
+          }
+      }
+
+      let wrapped_y = case new_y >. int.to_float(height) {
+        True -> 0.0
+        False ->
+          case new_y <. 0.0 {
+            True -> int.to_float(height)
+            False -> new_y
+          }
+      }
+
+      let new_tail = [#(wrapped_x, wrapped_y), ..model.tail]
+      let new_tail = case list.length(new_tail) > 50 {
+        True -> list.take(new_tail, 50)
+        False -> new_tail
+      }
+
+      Model(..model, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+    }
+
+    KeyDown("ArrowLeft") -> Model(..model, turning: Left)
+    KeyDown("ArrowRight") -> Model(..model, turning: Right)
+    KeyDown(_) -> model
+
+    KeyUp("ArrowLeft") | KeyUp("ArrowRight") ->
+      Model(..model, turning: Straight)
+    KeyUp(_) -> model
+
+    NoOp -> model
+  }
+
+  #(new_model, effect.none())
+}
+
+// ---
+// VIEW
+// ---
+fn view(model: Model) -> Element(Msg) {
+  let on_key_down =
+    event.on_keydown(fn(key) {
+      case key {
+        "ArrowLeft" | "A" | "a" -> KeyDown("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> KeyDown("ArrowRight")
+        _ -> NoOp
+      }
+    })
+
+  let on_key_up =
+    event.on_keyup(fn(key) {
+      case key {
+        "ArrowLeft" | "A" | "a" -> KeyUp("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> KeyUp("ArrowRight")
+        _ -> NoOp
+      }
+    })
+
+  let tail_points =
+    model.tail
+    |> list.map(fn(pos) {
+      let #(x, y) = pos
+      svg.circle([
+        attribute.attribute("cx", float.to_string(x)),
+        attribute.attribute("cy", float.to_string(y)),
+        attribute.attribute("r", "3"),
+        attribute.attribute("fill", "black"),
+      ])
+    })
+
+  element.fragment([html.style([], { "
       svg {
         background-color: oklch(98.4% 0.003 247.858);
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
+        top: 5;
+        left: 5;
+        width: " <> int.to_string(width) <> "px;
+        height: " <> int.to_string(height) <> "px;
       }
-      "
-    }),
-    html.div([attribute.id("controls")], [
-      html.button(
-        [
-          attribute.class("colour"),
-          attribute.style("background-color", "red"),
-          event.on_click(UserChangedColor(Red)),
-        ],
-        [],
-      ),
-      html.button(
-        [
-          attribute.class("colour selected"),
-          attribute.style("background-color", "green"),
-          event.on_click(UserChangedColor(Green)),
-        ],
-        [],
-      ),
-      html.button(
-        [
-          attribute.class("colour"),
-          attribute.style("background-color", "blue"),
-          event.on_click(UserChangedColor(Blue)),
-        ],
-        [],
-      ),
-      html.button(
-        [
-          attribute.class("colour"),
-          attribute.style("background-color", "yellow"),
-          event.on_click(UserChangedColor(Yellow)),
-        ],
-        [],
-      ),
-      html.button([event.on_click(UserClearedScreen)], [html.text("Clear")]),
-    ]),
-    html.svg([on_mouse_move], {
-      use points, #(x, y), color <- dict.fold(model.drawn_points, [])
-      let point =
+      " }), html.svg(
+      [
+        attribute.tabindex(0),
+        server_component.include(on_key_down, ["key"]),
+        server_component.include(on_key_up, ["key"]),
+      ],
+      [
         svg.circle([
-          attribute("cx", int.to_string(x)),
-          attribute("cy", int.to_string(y)),
-          attribute("r", "5"),
-          attribute("fill", to_string(color)),
-        ])
-
-      [point, ..points]
-    }),
-  ])
+          attribute.attribute("cx", float.to_string(model.x)),
+          attribute.attribute("cy", float.to_string(model.y)),
+          attribute.attribute("r", "5"),
+          attribute.attribute("fill", "black"),
+        ]),
+        ..tail_points
+      ],
+    )])
 }

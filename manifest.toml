@@ -2,6 +2,7 @@
 # You typically do not need to edit this file
 
 packages = [
+  { name = "gleam_community_maths", version = "2.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_yielder"], otp_app = "gleam_community_maths", source = "hex", outer_checksum = "C9EFF6BCF3C9D113EF9837655B0128CA8CAC295131E9F3468F93C1D78EC3E013" },
   { name = "gleam_crypto", version = "1.5.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_crypto", source = "hex", outer_checksum = "50774BAFFF1144E7872814C566C5D653D83A3EBF23ACC3156B757A1B6819086E" },
   { name = "gleam_erlang", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_erlang", source = "hex", outer_checksum = "F91CE62A2D011FA13341F3723DB7DB118541AAA5FE7311BD2716D018F01EF9E3" },
   { name = "gleam_http", version = "4.1.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_http", source = "hex", outer_checksum = "DD0271B32C356FB684EC7E9F48B1E835D0480168848581F68983C0CC371405D4" },
@@ -21,6 +22,7 @@ packages = [
 ]
 
 [requirements]
+gleam_community_maths = { version = ">= 2.0.0 and < 3.0.0" }
 gleam_erlang = { version = ">= 1.2.0 and < 2.0.0" }
 gleam_http = { version = ">= 4.1.1 and < 5.0.0" }
 gleam_json = { version = ">= 3.0.2 and < 4.0.0" }
