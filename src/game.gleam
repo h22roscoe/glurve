@@ -1,3 +1,4 @@
+import constants.{height, tick_delay_ms, width}
 import game_message.{type Msg}
 import gleam/int
 import gleam/list
@@ -12,12 +13,6 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 import player
-
-const tick_delay_ms = 10
-
-const width = 500
-
-const height = 500
 
 pub fn component() -> App(Nil, Model, Msg) {
   lustre.application(init, update, view)

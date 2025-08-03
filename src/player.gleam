@@ -1,3 +1,4 @@
+import constants.{height, tick_delay_ms, width}
 import game_message.{type Msg}
 import gleam/float
 import gleam/int
@@ -6,12 +7,6 @@ import gleam_community/maths
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/svg
-
-const tick_delay_ms = 10
-
-const width = 500
-
-const height = 500
 
 const tail_radius = 3.0
 
