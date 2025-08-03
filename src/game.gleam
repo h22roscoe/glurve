@@ -292,19 +292,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     game_message.Tick -> {
       let new_players =
         dict.map_values(model.players, fn(_, p) { player.update(p) })
-      let collided_players_with_self =
-        new_players
-        |> dict.values
-        |> list.filter(player.check_collision_with_self)
-      let collided_players_with_edges =
-        new_players
-        |> dict.values
-        |> list.filter(player.check_collision_with_edges)
+      let assert Ok(this_player) = dict.get(new_players, model.player_id)
+      let player_collided_with_self =
+        player.check_collision_with_self(this_player)
+      let player_collided_with_edges =
+        player.check_collision_with_edges(this_player)
+      let players_collided_with_other_players =
+        player.check_collision_with_other_players(this_player, new_players)
+      let player_collided =
+        player_collided_with_self
+        || player_collided_with_edges
+        || players_collided_with_other_players
 
-      case
-        list.flatten([collided_players_with_self, collided_players_with_edges])
-      {
-        [] -> #(Model(..model, players: new_players), effect.none())
+      case player_collided {
+        False -> #(Model(..model, players: new_players), effect.none())
         _ -> #(Model(..model, game_state: Ended), cancel_timer(model.timer))
       }
     }

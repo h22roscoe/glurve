@@ -1,4 +1,5 @@
 import constants.{height, width}
+import gleam/dict
 import gleam/int
 import gleam/list
 import gleam_community/colour
@@ -58,6 +59,35 @@ pub fn check_collision_with_edges(player: Player) -> Bool {
   || head_x >=. int.to_float(width)
   || head_y <=. 0.0
   || head_y >=. int.to_float(height)
+}
+
+pub fn check_collision_with_other_players(
+  player: Player,
+  players: dict.Dict(String, Player),
+) -> Bool {
+  let other_players = dict.delete(players, player.id)
+  let other_players_list =
+    dict.to_list(other_players)
+    |> list.map(fn(e) {
+      let #(_, p) = e
+      p
+    })
+  // Check if any of the points in the tails of the other players are colliding with this player
+  list.any(other_players_list, fn(p) {
+    let dx = player.position.x -. p.position.x
+    let dy = player.position.y -. p.position.y
+    let distance_squared = dx *. dx +. dy *. dy
+    let head_on_collision = distance_squared <. tail_radius *. tail_radius
+    let tail_collision =
+      list.any(p.tail, fn(pos) {
+        let #(tail_x, tail_y) = pos
+        let dx = player.position.x -. tail_x
+        let dy = player.position.y -. tail_y
+        let distance_squared = dx *. dx +. dy *. dy
+        distance_squared <. tail_radius *. tail_radius
+      })
+    head_on_collision || tail_collision
+  })
 }
 
 /// Returns a new player with the updated turning direction.
