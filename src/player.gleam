@@ -65,7 +65,7 @@ fn id_to_colour(id: Int) -> colour.Colour {
   }
 }
 
-pub fn check_collision(player: Player) -> Bool {
+pub fn check_collision_with_self(player: Player) -> Bool {
   let speed = player.speed
   let head_x = player.position.x
   let head_y = player.position.y
@@ -83,6 +83,15 @@ pub fn check_collision(player: Player) -> Bool {
         distance_squared <. collision_distance *. collision_distance
       })
   }
+}
+
+pub fn check_collision_with_edges(player: Player) -> Bool {
+  let head_x = player.position.x
+  let head_y = player.position.y
+  head_x <. 0.0
+  || head_x >. int.to_float(width)
+  || head_y <. 0.0
+  || head_y >. int.to_float(height)
 }
 
 /// Returns a new player with the updated turning direction.
