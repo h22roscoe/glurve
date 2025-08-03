@@ -3,12 +3,14 @@ import countdown
 import game_message.{type Msg}
 import gleam/dict
 import gleam/erlang/process
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/yielder
 import glubsub
+import gluid
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -18,8 +20,10 @@ import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
-import player
+import player/draw
+import player/player
 import position
+import uuid_colour
 
 pub type StartArgs {
   StartArgs(id: String, topic: glubsub.Topic(game_message.SharedMsg))
@@ -29,8 +33,13 @@ pub fn component() -> App(StartArgs, Model, Msg) {
   lustre.application(init, update, view)
 }
 
+pub fn glurve_id() -> String {
+  gluid.guidv4()
+}
+
 pub type Model {
   Model(
+    topic: glubsub.Topic(game_message.SharedMsg),
     game_state: GameState,
     player_id: String,
     players: dict.Dict(String, player.Player),
@@ -66,16 +75,35 @@ fn subscribe(
 }
 
 fn init(start_args: StartArgs) -> #(Model, Effect(Msg)) {
+  let this_player =
+    player.Player(
+      id: start_args.id,
+      position: position.random_start_position()
+        |> yielder.first()
+        |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
+      speed: 0.0,
+      angle: 0.0,
+      colour: uuid_colour.colour_for_uuid(start_args.id),
+      tail: [],
+      turning: player.Straight,
+    )
   let model =
     Model(
+      topic: start_args.topic,
       game_state: NotStarted,
       player_id: start_args.id,
-      players: dict.new(),
+      players: dict.from_list([#(start_args.id, this_player)]),
       timer: None,
       countdown_timer: None,
     )
 
-  #(model, subscribe(start_args.topic, game_message.RecievedSharedMsg))
+  #(
+    model,
+    effect.batch([
+      subscribe(start_args.topic, game_message.RecievedSharedMsg),
+      broadcast(start_args.topic, game_message.PlayerJoined(start_args.id)),
+    ]),
+  )
 }
 
 fn tick_effect() -> Effect(Msg) {
@@ -115,6 +143,12 @@ fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(Msg) {
   }
 }
 
+fn broadcast(channel: glubsub.Topic(msg), msg: msg) -> Effect(any) {
+  use _dispatch <- effect.from
+  let assert Ok(_) = glubsub.broadcast(channel, msg)
+  Nil
+}
+
 fn handle_turn(
   players: dict.Dict(String, player.Player),
   player_id: String,
@@ -126,15 +160,90 @@ fn handle_turn(
   }
 }
 
-fn handle_player_moved(
-  players: dict.Dict(String, player.Player),
-  player_id: String,
-  position: position.Position,
-  angle: Float,
-) -> dict.Dict(String, player.Player) {
-  case dict.get(players, player_id) {
-    Ok(p) -> dict.insert(players, player_id, player.move(p, position, angle))
-    Error(_) -> players
+fn handle_shared_msg(
+  model: Model,
+  shared_msg: game_message.SharedMsg,
+) -> #(Model, Effect(Msg)) {
+  case shared_msg {
+    game_message.PlayerJoined(player_id) -> #(
+      Model(
+        ..model,
+        players: dict.insert(
+          model.players,
+          player_id,
+          player.Player(
+            id: player_id,
+            colour: uuid_colour.colour_for_uuid(player_id),
+            position: position.Position(x: 0.0, y: 0.0),
+            speed: 0.0,
+            angle: 0.0,
+            tail: [],
+            turning: player.Straight,
+          ),
+        ),
+      ),
+      broadcast(model.topic, game_message.ExistingPlayer(model.player_id)),
+    )
+    game_message.ExistingPlayer(player_id) -> #(
+      Model(
+        ..model,
+        players: dict.insert(
+          model.players,
+          player_id,
+          player.Player(
+            id: player_id,
+            colour: uuid_colour.colour_for_uuid(player_id),
+            position: position.Position(x: 0.0, y: 0.0),
+            speed: 0.0,
+            angle: 0.0,
+            tail: [],
+            turning: player.Straight,
+          ),
+        ),
+      ),
+      effect.none(),
+    )
+    game_message.PlayerLeft(player_id) -> #(
+      Model(..model, players: dict.delete(model.players, player_id)),
+      effect.none(),
+    )
+    game_message.StartedGame -> {
+      let num_players = dict.size(model.players)
+      let positions =
+        yielder.take(position.random_start_position(), num_players)
+        |> yielder.to_list()
+      let players =
+        dict.to_list(model.players)
+        |> list.zip(positions)
+        |> list.map(fn(zipped) {
+          let #(#(id, player), pos) = zipped
+          #(id, player.Player(..player, position: pos))
+        })
+        |> dict.from_list()
+      #(
+        Model(
+          ..model,
+          players: players,
+          game_state: Countdown(3),
+          // Will be set by the NewTimer message
+          timer: None,
+          countdown_timer: None,
+        ),
+        effect.batch([countdown_effect(), tick_effect()]),
+      )
+    }
+    game_message.PlayerTurning(player_id, direction) -> {
+      case player_id == model.player_id {
+        True -> #(model, effect.none())
+        False -> #(
+          Model(
+            ..model,
+            players: handle_turn(model.players, player_id, direction),
+          ),
+          effect.none(),
+        )
+      }
+    }
   }
 }
 
@@ -172,52 +281,13 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    game_message.StartGame -> {
-      let p =
-        player.Player(
-          id: model.player_id,
-          position: position.random_start_position()
-            |> yielder.first()
-            |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
-          speed: 0.0,
-          angle: 0.0,
-          tail: [],
-          turning: player.Straight,
-        )
-      #(
-        Model(
-          game_state: Countdown(3),
-          player_id: model.player_id,
-          players: dict.from_list([#(p.id, p)]),
-          // Will be set by the NewTimer message
-          timer: None,
-          countdown_timer: None,
-        ),
-        effect.batch([countdown_effect(), tick_effect()]),
-      )
-    }
+    game_message.KickOffGame -> #(
+      model,
+      broadcast(model.topic, game_message.StartedGame),
+    )
 
-    game_message.RecievedSharedMsg(game_message.ClientPlayerMoved(
-      player_id,
-      position,
-      angle,
-    )) -> {
-      case player_id == model.player_id {
-        True -> #(model, effect.none())
-        False -> #(
-          Model(
-            ..model,
-            players: handle_player_moved(
-              model.players,
-              player_id,
-              position,
-              angle,
-            ),
-          ),
-          effect.none(),
-        )
-      }
-    }
+    game_message.RecievedSharedMsg(shared_msg) ->
+      handle_shared_msg(model, shared_msg)
 
     game_message.Tick -> {
       let new_players =
@@ -240,34 +310,44 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     game_message.KeyDown("ArrowRight") -> {
+      let broadcast_msg =
+        game_message.PlayerTurning(model.player_id, player.Right)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
+
       #(
         Model(
           ..model,
           players: handle_turn(model.players, model.player_id, player.Right),
         ),
-        effect.none(),
+        broadcast_effect,
       )
     }
 
     game_message.KeyDown("ArrowLeft") -> {
+      let broadcast_msg =
+        game_message.PlayerTurning(model.player_id, player.Left)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
       #(
         Model(
           ..model,
           players: handle_turn(model.players, model.player_id, player.Left),
         ),
-        effect.none(),
+        broadcast_effect,
       )
     }
 
     game_message.KeyDown(_) -> #(model, effect.none())
 
     game_message.KeyUp("ArrowLeft") | game_message.KeyUp("ArrowRight") -> {
+      let broadcast_msg =
+        game_message.PlayerTurning(model.player_id, player.Straight)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
       #(
         Model(
           ..model,
           players: handle_turn(model.players, model.player_id, player.Straight),
         ),
-        effect.none(),
+        broadcast_effect,
       )
     }
 
@@ -296,11 +376,19 @@ fn view(model: Model) -> Element(Msg) {
       }
     })
 
-  let player_elements = list.flat_map(dict.values(model.players), player.draw)
+  let player_elements =
+    list.flat_map(dict.values(model.players), draw.draw_player)
+  let num_players = dict.size(model.players)
+  let players_list =
+    dict.values(model.players)
+    |> list.map(fn(p: player.Player) { p.id })
+    |> list.index_map(fn(id, idx) {
+      overlay_text_with_index("Player: " <> id, idx, num_players)
+    })
 
   let overlay_elements = case model.game_state {
     NotStarted -> {
-      [overlay_text("Click to Start")]
+      [overlay_text("Click to Start"), ..players_list]
     }
     Countdown(count) -> {
       countdown.draw(count)
@@ -312,8 +400,9 @@ fn view(model: Model) -> Element(Msg) {
   }
 
   let svg_children = case model.game_state {
-    NotStarted | Ended -> overlay_elements
-    Countdown(_) -> list.flatten([overlay_elements, player_elements])
+    Ended -> overlay_elements
+    Countdown(_) | NotStarted ->
+      list.flatten([overlay_elements, player_elements])
     _ -> player_elements
   }
 
@@ -351,9 +440,35 @@ fn overlay_text(text: String) -> #(String, Element(Msg)) {
         attribute.attribute("font-family", "sans-serif"),
         attribute.attribute("fill", "black"),
         attribute.style("cursor", "pointer"),
-        event.on_click(game_message.StartGame),
+        event.on_click(game_message.KickOffGame),
       ],
       text,
     )
-  #("overlay", text_element)
+  #(text, text_element)
+}
+
+fn overlay_text_with_index(
+  text: String,
+  idx: Int,
+  total: Int,
+) -> #(String, Element(Msg)) {
+  let offset = 50.0
+  let spacing = 50.0
+  let percentage =
+    offset +. { spacing *. int.to_float(idx + 1) /. int.to_float(total + 1) }
+  let y = float.to_string(percentage) <> "%"
+  let text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", y),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "12"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "black"),
+      ],
+      text,
+    )
+  #(text <> int.to_string(idx), text_element)
 }

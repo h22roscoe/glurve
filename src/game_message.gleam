@@ -1,4 +1,4 @@
-import position.{type Position}
+import player/player.{type TurnDirection}
 
 pub type TimerID
 
@@ -13,9 +13,9 @@ pub fn apply_interval(
 
 pub type Msg {
   RecievedSharedMsg(SharedMsg)
+  KickOffGame
   NewTimer(TimerID)
   NewCountdownTimer(TimerID)
-  StartGame
   CountdownTick
   Tick
   KeyDown(String)
@@ -24,5 +24,9 @@ pub type Msg {
 }
 
 pub type SharedMsg {
-  ClientPlayerMoved(String, Position, Float)
+  PlayerJoined(String)
+  ExistingPlayer(String)
+  PlayerLeft(String)
+  StartedGame
+  PlayerTurning(String, TurnDirection)
 }
