@@ -1,7 +1,6 @@
-import gleam/float
+import game_message.{type Msg}
 import gleam/int
 import gleam/list
-import gleam_community/maths
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -11,16 +10,9 @@ import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
+import player
 
 const tick_delay_ms = 10
-
-const head_radius = 5.0
-
-const tail_radius = 3.0
-
-const speed = 1.0
-
-const turn_rate = 0.05
 
 const width = 500
 
@@ -37,26 +29,13 @@ pub fn component() -> App(Nil, Model, Msg) {
 // MODEL
 // ---
 pub type Model {
-  Model(
-    game_state: GameState,
-    x: Float,
-    y: Float,
-    angle: Float,
-    tail: List(#(Float, Float)),
-    turning: TurnDirection,
-  )
+  Model(game_state: GameState, players: List(player.Player))
 }
 
 pub type GameState {
   NotStarted
   Playing
   Ended
-}
-
-pub type TurnDirection {
-  Left
-  Right
-  Straight
 }
 
 type TimerID
@@ -68,111 +47,85 @@ fn apply_interval(
 ) -> Result(TimerID, String)
 
 fn init(_) -> #(Model, Effect(Msg)) {
-  let model =
-    Model(
-      game_state: NotStarted,
-      x: 250.0,
-      y: 250.0,
-      angle: 0.0,
-      tail: [],
-      turning: Straight,
-    )
+  let model = Model(game_state: NotStarted, players: [])
 
   #(model, effect.none())
 }
 
-// ---
-// UPDATE
-// ---
-pub type Msg {
-  StartGame
-  Tick
-  KeyDown(String)
-  KeyUp(String)
-  NoOp
-}
-
 fn tick_effect() -> Effect(Msg) {
   effect.from(fn(dispatch) {
-    case apply_interval(tick_delay_ms, fn() { dispatch(Tick) }) {
+    case apply_interval(tick_delay_ms, fn() { dispatch(game_message.Tick) }) {
       Ok(_) -> Nil
       Error(_) -> Nil
     }
   })
 }
 
-fn check_collision(model: Model) -> Bool {
-  let head_x = model.x
-  let head_y = model.y
-  let collision_distance = tail_radius +. tail_radius
-
-  list.any(
-    list.drop(model.tail, float.round(head_radius) * tick_delay_ms),
-    fn(pos) {
-      let #(tail_x, tail_y) = pos
-      let dx = head_x -. tail_x
-      let dy = head_y -. tail_y
-      let distance_squared = dx *. dx +. dy *. dy
-      distance_squared <. collision_distance *. collision_distance
-    },
-  )
-}
-
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   let new_model = case msg {
-    StartGame -> Model(..model, game_state: Playing)
+    game_message.StartGame -> {
+      let player =
+        player.Player(
+          id: 1,
+          x: 250.0,
+          y: 250.0,
+          angle: 0.0,
+          tail: [],
+          turning: player.Straight,
+        )
+      Model(game_state: Playing, players: [player])
+    }
 
-    Tick -> {
-      let angle = case model.turning {
-        Left -> model.angle -. turn_rate
-        Right -> model.angle +. turn_rate
-        Straight -> model.angle
-      }
+    game_message.Tick -> {
+      let new_players = list.map(model.players, player.update)
+      let collided_players = list.filter(new_players, player.check_collision)
 
-      let new_x = model.x +. maths.cos(angle) *. speed
-      let new_y = model.y +. maths.sin(angle) *. speed
-
-      let wrapped_x = case new_x >. int.to_float(width) {
-        True -> 0.0
-        False ->
-          case new_x <. 0.0 {
-            True -> int.to_float(width)
-            False -> new_x
-          }
-      }
-
-      let wrapped_y = case new_y >. int.to_float(height) {
-        True -> 0.0
-        False ->
-          case new_y <. 0.0 {
-            True -> int.to_float(height)
-            False -> new_y
-          }
-      }
-
-      let new_tail = [#(model.x, model.y), ..model.tail]
-      let new_model =
-        Model(..model, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
-
-      case check_collision(new_model) {
-        True -> Model(..new_model, game_state: Ended)
-        False -> new_model
+      case collided_players {
+        [] -> Model(..model, players: new_players)
+        _ -> Model(..model, game_state: Ended)
       }
     }
 
-    KeyDown("ArrowLeft") -> Model(..model, turning: Left)
-    KeyDown("ArrowRight") -> Model(..model, turning: Right)
-    KeyDown(_) -> model
+    game_message.KeyDown(player_id, "ArrowLeft") ->
+      Model(
+        ..model,
+        players: list.map(model.players, fn(player) {
+          case player.id == player_id {
+            True -> player.turn(player, player.Left)
+            False -> player
+          }
+        }),
+      )
+    game_message.KeyDown(player_id, "ArrowRight") ->
+      Model(
+        ..model,
+        players: list.map(model.players, fn(player) {
+          case player.id == player_id {
+            True -> player.turn(player, player.Right)
+            False -> player
+          }
+        }),
+      )
+    game_message.KeyDown(_, _) -> model
 
-    KeyUp("ArrowLeft") | KeyUp("ArrowRight") ->
-      Model(..model, turning: Straight)
-    KeyUp(_) -> model
+    game_message.KeyUp(player_id, "ArrowLeft")
+    | game_message.KeyUp(player_id, "ArrowRight") ->
+      Model(
+        ..model,
+        players: list.map(model.players, fn(player) {
+          case player.id == player_id {
+            True -> player.turn(player, player.Straight)
+            False -> player
+          }
+        }),
+      )
+    game_message.KeyUp(_, _) -> model
 
-    NoOp -> model
+    game_message.NoOp -> model
   }
 
   case msg {
-    StartGame -> {
+    game_message.StartGame -> {
       #(new_model, tick_effect())
     }
     _ -> {
@@ -188,49 +141,22 @@ fn view(model: Model) -> Element(Msg) {
   let on_key_down =
     event.on_keydown(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> KeyDown("ArrowLeft")
-        "ArrowRight" | "D" | "d" -> KeyDown("ArrowRight")
-        _ -> NoOp
+        "ArrowLeft" | "A" | "a" -> game_message.KeyDown(1, "ArrowLeft")
+        "ArrowRight" | "D" | "d" -> game_message.KeyDown(1, "ArrowRight")
+        _ -> game_message.NoOp
       }
     })
 
   let on_key_up =
     event.on_keyup(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> KeyUp("ArrowLeft")
-        "ArrowRight" | "D" | "d" -> KeyUp("ArrowRight")
-        _ -> NoOp
+        "ArrowLeft" | "A" | "a" -> game_message.KeyUp(1, "ArrowLeft")
+        "ArrowRight" | "D" | "d" -> game_message.KeyUp(1, "ArrowRight")
+        _ -> game_message.NoOp
       }
     })
 
-  let tail_points =
-    model.tail
-    |> list.map(fn(pos) {
-      let #(x, y) = pos
-      svg.circle([
-        attribute.attribute("cx", float.to_string(x)),
-        attribute.attribute("cy", float.to_string(y)),
-        attribute.attribute("r", float.to_string(tail_radius)),
-        attribute.attribute("fill", "black"),
-      ])
-    })
-
-  let head =
-    svg.circle([
-      attribute.attribute("cx", float.to_string(model.x)),
-      attribute.attribute("cy", float.to_string(model.y)),
-      attribute.attribute("r", float.to_string(head_radius)),
-      attribute.attribute("fill", "black"),
-    ])
-
-  let head_keyed = #("head", head)
-
-  let tail_points_len = list.length(tail_points)
-  let tail_points_keyed =
-    tail_points
-    |> list.index_map(fn(pos, index) {
-      #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
-    })
+  let player_elements = list.flat_map(model.players, player.draw)
 
   let overlay_elements = case model.game_state {
     NotStarted -> {
@@ -245,7 +171,7 @@ fn view(model: Model) -> Element(Msg) {
             attribute.attribute("font-family", "sans-serif"),
             attribute.attribute("fill", "black"),
             attribute.style("cursor", "pointer"),
-            event.on_click(StartGame),
+            event.on_click(game_message.StartGame),
           ],
           "Click to Start",
         )
@@ -263,6 +189,8 @@ fn view(model: Model) -> Element(Msg) {
             attribute.attribute("font-size", "24"),
             attribute.attribute("font-family", "sans-serif"),
             attribute.attribute("fill", "black"),
+            attribute.style("cursor", "pointer"),
+            event.on_click(game_message.StartGame),
           ],
           "Game Over",
         )
@@ -272,7 +200,7 @@ fn view(model: Model) -> Element(Msg) {
 
   let svg_children = case model.game_state {
     NotStarted | Ended -> overlay_elements
-    _ -> [head_keyed, ..tail_points_keyed]
+    _ -> player_elements
   }
 
   element.fragment([html.style([], { "

@@ -1,4 +1,5 @@
 import game
+import game_message.{type Msg}
 import gleam/bytes_tree
 import gleam/erlang/application
 import gleam/erlang/process.{type Selector, type Subject}
@@ -87,7 +88,7 @@ fn serve_runtime() -> Response(ResponseData) {
 
 fn serve_game(
   request: Request(Connection),
-  component: lustre.Runtime(game.Msg),
+  component: lustre.Runtime(Msg),
 ) -> Response(ResponseData) {
   mist.websocket(
     request:,
@@ -99,18 +100,18 @@ fn serve_game(
 
 type GameSocket {
   GameSocket(
-    component: lustre.Runtime(game.Msg),
-    self: Subject(server_component.ClientMessage(game.Msg)),
+    component: lustre.Runtime(Msg),
+    self: Subject(server_component.ClientMessage(Msg)),
   )
 }
 
 type GameSocketMessage =
-  server_component.ClientMessage(game.Msg)
+  server_component.ClientMessage(Msg)
 
 type GameSocketInit =
   #(GameSocket, Option(Selector(GameSocketMessage)))
 
-fn init_game_socket(_, component: lustre.Runtime(game.Msg)) -> GameSocketInit {
+fn init_game_socket(_, component: lustre.Runtime(Msg)) -> GameSocketInit {
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)
 
