@@ -1,0 +1,26 @@
+name = "glurve"
+
+version = "1.0.0"
+
+description = "This is a Gleam implementation of [Curve Fever](https://en.wikipedia.org/wiki/Achtung,_die_Kurve!)"
+
+licences = ["GPL-3.0-only"]
+
+repository = { type = "github", user = "h22roscoe", repo = "glurve" }
+
+# links = [{ title = "Website", href = "" }]
+
+target = "erlang"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+lustre = ">= 5.2.1 and < 6.0.0"
+mist = ">= 5.0.2 and < 6.0.0"
+gleam_otp = ">= 1.0.0 and < 2.0.0"
+gleam_json = ">= 3.0.2 and < 4.0.0"
+gleam_http = ">= 4.1.1 and < 5.0.0"
+gleam_erlang = ">= 1.2.0 and < 2.0.0"
+gleam_community_maths = ">= 2.0.0 and < 3.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
