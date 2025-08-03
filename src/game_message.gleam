@@ -12,6 +12,7 @@ pub fn apply_interval(
 pub type Msg {
   NewTimer(TimerID)
   StartGame
+  CountdownTick
   Tick
   KeyDown(Int, String)
   KeyUp(Int, String)
