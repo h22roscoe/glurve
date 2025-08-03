@@ -11,6 +11,7 @@ pub fn apply_interval(
 
 pub type Msg {
   NewTimer(TimerID)
+  NewCountdownTimer(TimerID)
   StartGame
   CountdownTick
   Tick

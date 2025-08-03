@@ -23,6 +23,7 @@ pub type Model {
     game_state: GameState,
     players: List(player.Player),
     timer: Option(game_message.TimerID),
+    countdown_timer: Option(game_message.TimerID),
   )
 }
 
@@ -34,7 +35,13 @@ pub type GameState {
 }
 
 fn init(_) -> #(Model, Effect(Msg)) {
-  let model = Model(game_state: NotStarted, players: [], timer: None)
+  let model =
+    Model(
+      game_state: NotStarted,
+      players: [],
+      timer: None,
+      countdown_timer: None,
+    )
 
   #(model, effect.none())
 }
@@ -59,7 +66,7 @@ fn countdown_effect() -> Effect(Msg) {
         dispatch(game_message.CountdownTick)
       })
     {
-      Ok(timer) -> dispatch(game_message.NewTimer(timer))
+      Ok(timer) -> dispatch(game_message.NewCountdownTimer(timer))
       Error(_) -> Nil
     }
   })
@@ -83,13 +90,21 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
 
+    game_message.NewCountdownTimer(timer) -> #(
+      Model(..model, countdown_timer: Some(timer)),
+      effect.none(),
+    )
+
     game_message.CountdownTick -> {
+      let players_with_speed =
+        list.map(model.players, fn(p) { p |> player.update_speed(1.0) })
+
       case model.game_state {
         Countdown(count) ->
           case count {
             1 -> #(
-              Model(..model, game_state: Playing),
-              effect.batch([cancel_timer(model.timer), tick_effect()]),
+              Model(..model, game_state: Playing, players: players_with_speed),
+              cancel_timer(model.countdown_timer),
             )
             _ -> #(
               Model(..model, game_state: Countdown(count - 1)),
@@ -106,6 +121,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
           id: 1,
           x: 250.0,
           y: 250.0,
+          speed: 0.0,
           angle: 0.0,
           tail: [],
           turning: player.Straight,
@@ -116,8 +132,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
           players: [player],
           // Will be set by the NewTimer message
           timer: None,
+          countdown_timer: None,
         ),
-        countdown_effect(),
+        effect.batch([countdown_effect(), tick_effect()]),
       )
     }
 

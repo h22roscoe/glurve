@@ -12,8 +12,6 @@ const tail_radius = 3.0
 
 const head_size = 10.0
 
-const speed = 1.0
-
 const turn_rate = 0.05
 
 pub type TurnDirection {
@@ -27,6 +25,7 @@ pub type Player {
     id: Int,
     x: Float,
     y: Float,
+    speed: Float,
     angle: Float,
     tail: List(#(Float, Float)),
     turning: TurnDirection,
@@ -34,22 +33,31 @@ pub type Player {
 }
 
 pub fn check_collision(player: Player) -> Bool {
+  let speed = player.speed
   let head_x = player.x
   let head_y = player.y
   let collision_distance = tail_radius +. tail_radius
-
-  list.any(list.drop(player.tail, 5 * tick_delay_ms), fn(pos) {
-    let #(tail_x, tail_y) = pos
-    let dx = head_x -. tail_x
-    let dy = head_y -. tail_y
-    let distance_squared = dx *. dx +. dy *. dy
-    distance_squared <. collision_distance *. collision_distance
-  })
+  case speed {
+    0.0 -> False
+    _ ->
+      list.any(list.drop(player.tail, 5 * tick_delay_ms), fn(pos) {
+        let #(tail_x, tail_y) = pos
+        let dx = head_x -. tail_x
+        let dy = head_y -. tail_y
+        let distance_squared = dx *. dx +. dy *. dy
+        distance_squared <. collision_distance *. collision_distance
+      })
+  }
 }
 
 /// Returns a new player with the updated turning direction.
 pub fn turn(player: Player, direction: TurnDirection) -> Player {
   Player(..player, turning: direction)
+}
+
+/// Returns a new player with the updated speed.
+pub fn update_speed(player: Player, speed: Float) -> Player {
+  Player(..player, speed: speed)
 }
 
 /// Returns a new player with the updated position and tail based on a game tick.
@@ -60,8 +68,8 @@ pub fn update(player: Player) -> Player {
     Straight -> player.angle
   }
 
-  let new_x = player.x +. maths.cos(angle) *. speed
-  let new_y = player.y +. maths.sin(angle) *. speed
+  let new_x = player.x +. maths.cos(angle) *. player.speed
+  let new_y = player.y +. maths.sin(angle) *. player.speed
 
   let wrapped_x = case new_x >. int.to_float(width) {
     True -> 0.0
@@ -83,7 +91,11 @@ pub fn update(player: Player) -> Player {
 
   let new_tail = [#(player.x, player.y), ..player.tail]
 
-  Player(..player, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+  case player.speed {
+    0.0 -> Player(..player, angle: angle)
+    _ ->
+      Player(..player, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+  }
 }
 
 /// Draws the player to an SVG element.
