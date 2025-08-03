@@ -5,6 +5,8 @@ import gleam/dict
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
+import gleam/yielder
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -135,7 +137,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       let p =
         player.Player(
           id: 1,
-          position: position.random_start_position(),
+          position: position.random_start_position()
+            |> yielder.first()
+            |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
           speed: 0.0,
           angle: 0.0,
           tail: [],
