@@ -1,8 +1,9 @@
-import constants.{height, width}
+import constants.{height, max_players, width}
 import game_message.{type Msg}
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam_community/colour
 import gleam_community/maths
 import lustre/attribute
 import lustre/element.{type Element}
@@ -34,6 +35,14 @@ pub type Player {
     tail: List(#(Float, Float)),
     turning: TurnDirection,
   )
+}
+
+fn id_to_colour(id: Int) -> colour.Colour {
+  let hue = int.to_float(id) /. int.to_float(max_players)
+  case colour.from_hsl(hue, 1.0, 0.5) {
+    Ok(colour) -> colour
+    Error(_) -> colour.black
+  }
 }
 
 pub fn check_collision(player: Player) -> Bool {
@@ -95,6 +104,8 @@ pub fn update(player: Player) -> Player {
 /// that is used as the key of the element in the list, so that we only rerender
 /// new keyed elements.
 pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
+  let colour = id_to_colour(player.id)
+
   let tail_points =
     player.tail
     |> list.map(fn(pos) {
@@ -103,7 +114,9 @@ pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
         attribute.attribute("cx", float.to_string(x)),
         attribute.attribute("cy", float.to_string(y)),
         attribute.attribute("r", float.to_string(tail_radius)),
-        attribute.attribute("fill", "black"),
+        attribute.attribute("fill", colour.to_css_rgba_string(colour)),
+        attribute.attribute("stroke", "black"),
+        attribute.attribute("stroke-width", "0.02"),
       ])
     })
 
@@ -138,7 +151,9 @@ pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
   let head =
     svg.polygon([
       attribute.attribute("points", points),
-      attribute.attribute("fill", "black"),
+      attribute.attribute("fill", colour.to_css_rgba_string(colour)),
+      attribute.attribute("stroke", "black"),
+      attribute.attribute("stroke-width", "0.1"),
     ])
 
   let head_keyed = #("head", head)
