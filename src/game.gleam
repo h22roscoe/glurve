@@ -3,6 +3,7 @@ import game_message.{type Msg}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam_community/colour
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -215,6 +216,11 @@ fn view(model: Model) -> Element(Msg) {
       }
     })
 
+  let countdown_colour = case colour.from_hsla(1.0, 1.0, 0.0, 0.15) {
+    Ok(c) -> c
+    Error(_) -> colour.black
+  }
+
   let player_elements = list.flat_map(model.players, player.draw)
 
   let overlay_elements = case model.game_state {
@@ -244,9 +250,12 @@ fn view(model: Model) -> Element(Msg) {
             attribute.attribute("y", "50%"),
             attribute.attribute("text-anchor", "middle"),
             attribute.attribute("dominant-baseline", "middle"),
-            attribute.attribute("font-size", "24"),
+            attribute.attribute("font-size", "200"),
             attribute.attribute("font-family", "sans-serif"),
-            attribute.attribute("fill", "black"),
+            attribute.attribute(
+              "fill",
+              colour.to_css_rgba_string(countdown_colour),
+            ),
           ],
           int.to_string(count),
         )
