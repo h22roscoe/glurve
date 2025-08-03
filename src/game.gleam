@@ -2,11 +2,13 @@ import constants.{height, tick_delay_ms, width}
 import countdown
 import game_message.{type Msg}
 import gleam/dict
+import gleam/erlang/process
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/yielder
+import glubsub
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -19,13 +21,14 @@ import lustre/server_component
 import player
 import position
 
-pub fn component() -> App(Nil, Model, Msg) {
+pub fn component() -> App(glubsub.Topic(game_message.SharedMsg), Model, Msg) {
   lustre.application(init, update, view)
 }
 
 pub type Model {
   Model(
     game_state: GameState,
+    player_id: Int,
     players: dict.Dict(Int, player.Player),
     timer: Option(game_message.TimerID),
     countdown_timer: Option(game_message.TimerID),
@@ -39,16 +42,36 @@ pub type GameState {
   Ended
 }
 
-fn init(_) -> #(Model, Effect(Msg)) {
+fn subscribe(
+  topic: glubsub.Topic(topic),
+  on_msg handle_msg: fn(topic) -> msg,
+) -> Effect(msg) {
+  // Using the special `select` effect, we get a fresh new subject that we can
+  // use to subscribe to glubsub.
+  use _dispatch, subject <- server_component.select
+
+  let assert Ok(_) = glubsub.subscribe(topic, subject)
+
+  // We need to teach the server component runtime to listen for messages on
+  // this subject by returning a `Selector` that matches our apps `msg` type.
+  let selector =
+    process.new_selector()
+    |> process.select_map(subject, handle_msg)
+
+  selector
+}
+
+fn init(topic: glubsub.Topic(game_message.SharedMsg)) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       game_state: NotStarted,
+      player_id: 1,
       players: dict.new(),
       timer: None,
       countdown_timer: None,
     )
 
-  #(model, effect.none())
+  #(model, subscribe(topic, game_message.RecievedSharedMsg))
 }
 
 fn tick_effect() -> Effect(Msg) {
@@ -95,6 +118,18 @@ fn handle_turn(
 ) -> dict.Dict(Int, player.Player) {
   case dict.get(players, player_id) {
     Ok(p) -> dict.insert(players, player_id, player.turn(p, direction))
+    Error(_) -> players
+  }
+}
+
+fn handle_player_moved(
+  players: dict.Dict(Int, player.Player),
+  player_id: Int,
+  position: position.Position,
+  angle: Float,
+) -> dict.Dict(Int, player.Player) {
+  case dict.get(players, player_id) {
+    Ok(p) -> dict.insert(players, player_id, player.move(p, position, angle))
     Error(_) -> players
   }
 }
@@ -148,6 +183,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(
         Model(
           game_state: Countdown(3),
+          player_id: 1,
           players: dict.from_list([#(p.id, p)]),
           // Will be set by the NewTimer message
           timer: None,
@@ -155,6 +191,28 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         ),
         effect.batch([countdown_effect(), tick_effect()]),
       )
+    }
+
+    game_message.RecievedSharedMsg(game_message.ClientPlayerMoved(
+      player_id,
+      position,
+      angle,
+    )) -> {
+      case player_id == model.player_id {
+        True -> #(model, effect.none())
+        False -> #(
+          Model(
+            ..model,
+            players: handle_player_moved(
+              model.players,
+              player_id,
+              position,
+              angle,
+            ),
+          ),
+          effect.none(),
+        )
+      }
     }
 
     game_message.Tick -> {
@@ -177,40 +235,39 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    game_message.KeyDown(player_id, "ArrowLeft") -> {
+    game_message.KeyDown("ArrowRight") -> {
       #(
         Model(
           ..model,
-          players: handle_turn(model.players, player_id, player.Left),
+          players: handle_turn(model.players, model.player_id, player.Right),
         ),
         effect.none(),
       )
     }
 
-    game_message.KeyDown(player_id, "ArrowRight") -> {
+    game_message.KeyDown("ArrowLeft") -> {
       #(
         Model(
           ..model,
-          players: handle_turn(model.players, player_id, player.Right),
+          players: handle_turn(model.players, model.player_id, player.Left),
         ),
         effect.none(),
       )
     }
 
-    game_message.KeyDown(_, _) -> #(model, effect.none())
+    game_message.KeyDown(_) -> #(model, effect.none())
 
-    game_message.KeyUp(player_id, "ArrowLeft")
-    | game_message.KeyUp(player_id, "ArrowRight") -> {
+    game_message.KeyUp("ArrowLeft") | game_message.KeyUp("ArrowRight") -> {
       #(
         Model(
           ..model,
-          players: handle_turn(model.players, player_id, player.Straight),
+          players: handle_turn(model.players, model.player_id, player.Straight),
         ),
         effect.none(),
       )
     }
 
-    game_message.KeyUp(_, _) -> #(model, effect.none())
+    game_message.KeyUp(_) -> #(model, effect.none())
 
     game_message.NoOp -> #(model, effect.none())
   }
@@ -220,8 +277,8 @@ fn view(model: Model) -> Element(Msg) {
   let on_key_down =
     event.on_keydown(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> game_message.KeyDown(1, "ArrowLeft")
-        "ArrowRight" | "D" | "d" -> game_message.KeyDown(1, "ArrowRight")
+        "ArrowLeft" | "A" | "a" -> game_message.KeyDown("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> game_message.KeyDown("ArrowRight")
         _ -> game_message.NoOp
       }
     })
@@ -229,8 +286,8 @@ fn view(model: Model) -> Element(Msg) {
   let on_key_up =
     event.on_keyup(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> game_message.KeyUp(1, "ArrowLeft")
-        "ArrowRight" | "D" | "d" -> game_message.KeyUp(1, "ArrowRight")
+        "ArrowLeft" | "A" | "a" -> game_message.KeyUp("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> game_message.KeyUp("ArrowRight")
         _ -> game_message.NoOp
       }
     })

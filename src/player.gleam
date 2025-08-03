@@ -104,6 +104,28 @@ pub fn update_speed(player: Player, speed: Float) -> Player {
   Player(..player, speed: speed)
 }
 
+pub fn move(player: Player, position: Position, angle: Float) -> Player {
+  let new_x = position.x +. maths.cos(angle) *. player.speed
+  let new_y = position.y +. maths.sin(angle) *. player.speed
+
+  let wrapped_x = wrap(new_x, width)
+
+  let wrapped_y = wrap(new_y, height)
+
+  let new_tail = [#(position.x, position.y), ..player.tail]
+
+  case player.speed {
+    0.0 -> Player(..player, angle: angle)
+    _ ->
+      Player(
+        ..player,
+        position: position.Position(x: wrapped_x, y: wrapped_y),
+        angle: angle,
+        tail: new_tail,
+      )
+  }
+}
+
 /// Returns a new player with the updated position and tail based on a game tick.
 pub fn update(player: Player) -> Player {
   let angle = case player.turning {

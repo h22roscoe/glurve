@@ -7,6 +7,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/json
 import gleam/option.{type Option, None, Some}
+import glubsub
 import lustre
 import lustre/attribute
 import lustre/element
@@ -17,15 +18,14 @@ import mist.{type Connection, type ResponseData}
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
-  let game = game.component()
-  let assert Ok(component) = lustre.start_server_component(game, Nil)
+  let assert Ok(topic) = glubsub.new_topic()
 
   let assert Ok(_) =
     fn(request: Request(Connection)) -> Response(ResponseData) {
       case request.path_segments(request) {
         [] -> serve_html()
         ["lustre", "runtime.mjs"] -> serve_runtime()
-        ["ws"] -> serve_game(request, component)
+        ["ws"] -> serve_game(request, topic)
         _ -> response.set_body(response.new(404), mist.Bytes(bytes_tree.new()))
       }
     }
@@ -88,11 +88,11 @@ fn serve_runtime() -> Response(ResponseData) {
 
 fn serve_game(
   request: Request(Connection),
-  component: lustre.Runtime(Msg),
+  topic: glubsub.Topic(game_message.SharedMsg),
 ) -> Response(ResponseData) {
   mist.websocket(
     request:,
-    on_init: init_game_socket(_, component),
+    on_init: init_game_socket(_, topic),
     handler: loop_game_socket,
     on_close: close_game_socket,
   )
@@ -111,7 +111,13 @@ type GameSocketMessage =
 type GameSocketInit =
   #(GameSocket, Option(Selector(GameSocketMessage)))
 
-fn init_game_socket(_, component: lustre.Runtime(Msg)) -> GameSocketInit {
+fn init_game_socket(
+  _,
+  topic: glubsub.Topic(game_message.SharedMsg),
+) -> GameSocketInit {
+  let game = game.component()
+  let assert Ok(component) = lustre.start_server_component(game, topic)
+
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)
 
