@@ -10,6 +10,8 @@ import lustre/element/svg
 
 const tail_radius = 3.0
 
+const head_size = 10.0
+
 const speed = 1.0
 
 const turn_rate = 0.05
@@ -99,20 +101,19 @@ pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
     })
 
   // Draw a triangle "head" at (player.x, player.y) facing player.angle
-  let size = 7.0
   let angle = player.angle
 
   // Calculate the three points of the triangle
-  let tip_x = player.x +. maths.cos(angle) *. size
-  let tip_y = player.y +. maths.sin(angle) *. size
+  let tip_x = player.x +. maths.cos(angle) *. head_size
+  let tip_y = player.y +. maths.sin(angle) *. head_size
 
   let left_angle = angle +. maths.pi() *. 2.0 /. 3.0
-  let left_x = player.x +. maths.cos(left_angle) *. { size /. 1.5 }
-  let left_y = player.y +. maths.sin(left_angle) *. { size /. 1.5 }
+  let left_x = player.x +. maths.cos(left_angle) *. { head_size /. 1.5 }
+  let left_y = player.y +. maths.sin(left_angle) *. { head_size /. 1.5 }
 
   let right_angle = angle -. maths.pi() *. 2.0 /. 3.0
-  let right_x = player.x +. maths.cos(right_angle) *. { size /. 1.5 }
-  let right_y = player.y +. maths.sin(right_angle) *. { size /. 1.5 }
+  let right_x = player.x +. maths.cos(right_angle) *. { head_size /. 1.5 }
+  let right_y = player.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
 
   let points =
     float.to_string(tip_x)
