@@ -26,7 +26,7 @@ pub type Msg {
 pub type SharedMsg {
   PlayerJoined(String)
   ExistingPlayer(String)
-  PlayerLeft(String)
+  PlayerCrashed(String)
   StartedGame
   PlayerTurning(String, TurnDirection)
 }

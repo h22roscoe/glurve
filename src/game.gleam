@@ -52,6 +52,7 @@ pub type GameState {
   NotStarted
   Countdown(Int)
   Playing
+  Crashed
   Ended
 }
 
@@ -203,10 +204,27 @@ fn handle_shared_msg(
       ),
       effect.none(),
     )
-    game_message.PlayerLeft(player_id) -> #(
-      Model(..model, players: dict.delete(model.players, player_id)),
-      effect.none(),
-    )
+    game_message.PlayerCrashed(player_id) -> {
+      let assert Ok(that_player) = dict.get(model.players, player_id)
+      let that_player_crashed = player.Player(..that_player, speed: 0.0)
+      let new_players =
+        dict.insert(model.players, player_id, that_player_crashed)
+      let uncrashed_players =
+        dict.fold(new_players, 0, fn(acc, _, p) {
+          case p.speed == 0.0 {
+            True -> acc
+            False -> acc + 1
+          }
+        })
+      let finished = uncrashed_players <= 1
+      case finished {
+        True -> #(
+          Model(..model, players: new_players, game_state: Ended),
+          cancel_timer(model.timer),
+        )
+        False -> #(Model(..model, players: new_players), effect.none())
+      }
+    }
     game_message.StartedGame -> {
       let num_players = dict.size(model.players)
       let positions =
@@ -304,9 +322,19 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         || player_collided_with_edges
         || players_collided_with_other_players
 
+      let new_players_with_crashed =
+        dict.insert(
+          new_players,
+          model.player_id,
+          player.Player(..this_player, speed: 0.0),
+        )
+
       case player_collided {
         False -> #(Model(..model, players: new_players), effect.none())
-        _ -> #(Model(..model, game_state: Ended), cancel_timer(model.timer))
+        _ -> #(
+          Model(..model, players: new_players_with_crashed, game_state: Crashed),
+          broadcast(model.topic, game_message.PlayerCrashed(model.player_id)),
+        )
       }
     }
 
@@ -387,15 +415,72 @@ fn view(model: Model) -> Element(Msg) {
       overlay_text_with_index("Player: " <> id, idx, num_players)
     })
 
+  let start_text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "50%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "24"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "black"),
+        attribute.style("cursor", "pointer"),
+        event.on_click(game_message.KickOffGame),
+      ],
+      "Click to Start",
+    )
+
+  let game_over_text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "50%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "24"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "black"),
+      ],
+      "Game Over",
+    )
+
+  let winner_text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "50%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "24"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "black"),
+      ],
+      "You Win!",
+    )
+
   let overlay_elements = case model.game_state {
     NotStarted -> {
-      [overlay_text("Click to Start"), ..players_list]
+      [#("start", start_text_element), ..players_list]
     }
     Countdown(count) -> {
       countdown.draw(count)
     }
     Ended -> {
-      [overlay_text("Game Over")]
+      let winner =
+        model.players
+        |> dict.values
+        |> list.filter(fn(p) { p.speed != 0.0 })
+        |> list.first()
+      case winner {
+        Ok(winner) -> {
+          case winner.id == model.player_id {
+            True -> [#("winner", winner_text_element)]
+            False -> [#("game_over", game_over_text_element)]
+          }
+        }
+        Error(_) -> [#("game_over", game_over_text_element)]
+      }
     }
     _ -> []
   }
@@ -427,25 +512,6 @@ fn view(model: Model) -> Element(Msg) {
       ],
       svg_children,
     )])
-}
-
-fn overlay_text(text: String) -> #(String, Element(Msg)) {
-  let text_element =
-    svg.text(
-      [
-        attribute.attribute("x", "50%"),
-        attribute.attribute("y", "50%"),
-        attribute.attribute("text-anchor", "middle"),
-        attribute.attribute("dominant-baseline", "middle"),
-        attribute.attribute("font-size", "24"),
-        attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "black"),
-        attribute.style("cursor", "pointer"),
-        event.on_click(game_message.KickOffGame),
-      ],
-      text,
-    )
-  #(text, text_element)
 }
 
 fn overlay_text_with_index(
