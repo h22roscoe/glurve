@@ -116,7 +116,8 @@ fn init_game_socket(
   topic: glubsub.Topic(game_message.SharedMsg),
 ) -> GameSocketInit {
   let game = game.component()
-  let assert Ok(component) = lustre.start_server_component(game, topic)
+  let assert Ok(component) =
+    lustre.start_server_component(game, game.StartArgs(id: "1", topic:))
 
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)

@@ -21,15 +21,19 @@ import lustre/server_component
 import player
 import position
 
-pub fn component() -> App(glubsub.Topic(game_message.SharedMsg), Model, Msg) {
+pub type StartArgs {
+  StartArgs(id: String, topic: glubsub.Topic(game_message.SharedMsg))
+}
+
+pub fn component() -> App(StartArgs, Model, Msg) {
   lustre.application(init, update, view)
 }
 
 pub type Model {
   Model(
     game_state: GameState,
-    player_id: Int,
-    players: dict.Dict(Int, player.Player),
+    player_id: String,
+    players: dict.Dict(String, player.Player),
     timer: Option(game_message.TimerID),
     countdown_timer: Option(game_message.TimerID),
   )
@@ -61,17 +65,17 @@ fn subscribe(
   selector
 }
 
-fn init(topic: glubsub.Topic(game_message.SharedMsg)) -> #(Model, Effect(Msg)) {
+fn init(start_args: StartArgs) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       game_state: NotStarted,
-      player_id: 1,
+      player_id: start_args.id,
       players: dict.new(),
       timer: None,
       countdown_timer: None,
     )
 
-  #(model, subscribe(topic, game_message.RecievedSharedMsg))
+  #(model, subscribe(start_args.topic, game_message.RecievedSharedMsg))
 }
 
 fn tick_effect() -> Effect(Msg) {
@@ -112,10 +116,10 @@ fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(Msg) {
 }
 
 fn handle_turn(
-  players: dict.Dict(Int, player.Player),
-  player_id: Int,
+  players: dict.Dict(String, player.Player),
+  player_id: String,
   direction: player.TurnDirection,
-) -> dict.Dict(Int, player.Player) {
+) -> dict.Dict(String, player.Player) {
   case dict.get(players, player_id) {
     Ok(p) -> dict.insert(players, player_id, player.turn(p, direction))
     Error(_) -> players
@@ -123,11 +127,11 @@ fn handle_turn(
 }
 
 fn handle_player_moved(
-  players: dict.Dict(Int, player.Player),
-  player_id: Int,
+  players: dict.Dict(String, player.Player),
+  player_id: String,
   position: position.Position,
   angle: Float,
-) -> dict.Dict(Int, player.Player) {
+) -> dict.Dict(String, player.Player) {
   case dict.get(players, player_id) {
     Ok(p) -> dict.insert(players, player_id, player.move(p, position, angle))
     Error(_) -> players
@@ -171,7 +175,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     game_message.StartGame -> {
       let p =
         player.Player(
-          id: 1,
+          id: model.player_id,
           position: position.random_start_position()
             |> yielder.first()
             |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
@@ -183,7 +187,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(
         Model(
           game_state: Countdown(3),
-          player_id: 1,
+          player_id: model.player_id,
           players: dict.from_list([#(p.id, p)]),
           // Will be set by the NewTimer message
           timer: None,

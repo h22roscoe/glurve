@@ -1,6 +1,5 @@
-import constants.{height, max_players, width}
+import constants.{height, width}
 import game_message.{type Msg}
-import gleam/dict
 import gleam/float
 import gleam/int
 import gleam/list
@@ -29,40 +28,13 @@ pub type TurnDirection {
 
 pub type Player {
   Player(
-    id: Int,
+    id: String,
     position: Position,
     speed: Float,
     angle: Float,
     tail: List(#(Float, Float)),
     turning: TurnDirection,
   )
-}
-
-fn definite_hsl_colour(
-  hue: Float,
-  saturation: Float,
-  lightness: Float,
-) -> colour.Colour {
-  case colour.from_hsl(hue, saturation, lightness) {
-    Ok(colour) -> colour
-    Error(_) -> colour.black
-  }
-}
-
-fn id_to_colour(id: Int) -> colour.Colour {
-  let colours =
-    dict.new()
-    |> dict.insert(1, definite_hsl_colour(0.8611111111, 0.5, 0.9))
-    |> dict.insert(2, definite_hsl_colour(0.0, 0.5, 0.9))
-    |> dict.insert(3, definite_hsl_colour(0.3777777777, 0.5, 0.9))
-    |> dict.insert(4, definite_hsl_colour(0.7222222222, 0.5, 0.9))
-    |> dict.insert(5, definite_hsl_colour(0.222222222, 0.5, 0.9))
-    |> dict.insert(max_players, definite_hsl_colour(0.9666666666, 0.5, 0.9))
-
-  case dict.get(colours, id) {
-    Ok(colour) -> colour
-    Error(_) -> colour.black
-  }
 }
 
 pub fn check_collision_with_self(player: Player) -> Bool {
@@ -160,7 +132,7 @@ pub fn update(player: Player) -> Player {
 /// that is used as the key of the element in the list, so that we only rerender
 /// new keyed elements.
 pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
-  let colour = id_to_colour(player.id)
+  let colour = colour.blue
 
   let tail_points =
     player.tail

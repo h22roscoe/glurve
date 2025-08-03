@@ -24,5 +24,5 @@ pub type Msg {
 }
 
 pub type SharedMsg {
-  ClientPlayerMoved(Int, Position, Float)
+  ClientPlayerMoved(String, Position, Float)
 }
