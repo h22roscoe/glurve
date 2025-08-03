@@ -48,7 +48,7 @@ fn serve_html() -> Response(ResponseData) {
           attribute.name("viewport"),
           attribute.content("width=device-width, initial-scale=1"),
         ]),
-        html.title([], "06-server-components/04-multiple-clients"),
+        html.title([], "Glurve Fever"),
         html.script(
           [attribute.type_("module"), attribute.src("/lustre/runtime.mjs")],
           "",

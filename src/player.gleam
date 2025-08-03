@@ -1,4 +1,4 @@
-import constants.{height, tick_delay_ms, width}
+import constants.{height, width}
 import game_message.{type Msg}
 import gleam/float
 import gleam/int
@@ -13,6 +13,10 @@ const tail_radius = 3.0
 const head_size = 10.0
 
 const turn_rate = 0.05
+
+// The number of tail segments to skip when checking for collision. This is to
+// prevent the player from immediately colliding with their own tail.
+const tail_collision_grace_segments = 50
 
 pub type TurnDirection {
   Left
@@ -40,7 +44,7 @@ pub fn check_collision(player: Player) -> Bool {
   case speed {
     0.0 -> False
     _ ->
-      list.any(list.drop(player.tail, 5 * tick_delay_ms), fn(pos) {
+      list.any(list.drop(player.tail, tail_collision_grace_segments), fn(pos) {
         let #(tail_x, tail_y) = pos
         let dx = head_x -. tail_x
         let dy = head_y -. tail_y
@@ -71,23 +75,9 @@ pub fn update(player: Player) -> Player {
   let new_x = player.x +. maths.cos(angle) *. player.speed
   let new_y = player.y +. maths.sin(angle) *. player.speed
 
-  let wrapped_x = case new_x >. int.to_float(width) {
-    True -> 0.0
-    False ->
-      case new_x <. 0.0 {
-        True -> int.to_float(width)
-        False -> new_x
-      }
-  }
+  let wrapped_x = wrap(new_x, width)
 
-  let wrapped_y = case new_y >. int.to_float(height) {
-    True -> 0.0
-    False ->
-      case new_y <. 0.0 {
-        True -> int.to_float(height)
-        False -> new_y
-      }
-  }
+  let wrapped_y = wrap(new_y, height)
 
   let new_tail = [#(player.x, player.y), ..player.tail]
 
@@ -159,4 +149,16 @@ pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
     })
 
   [head_keyed, ..tail_points_keyed]
+}
+
+fn wrap(value: Float, max: Int) -> Float {
+  let maxf = int.to_float(max)
+  case value >. maxf {
+    True -> 0.0
+    False ->
+      case value <. 0.0 {
+        True -> maxf
+        False -> value
+      }
+  }
 }

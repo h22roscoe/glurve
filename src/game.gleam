@@ -85,6 +85,17 @@ fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(Msg) {
   }
 }
 
+fn handle_turn(
+  players: dict.Dict(Int, player.Player),
+  player_id: Int,
+  direction: player.TurnDirection,
+) -> dict.Dict(Int, player.Player) {
+  case dict.get(players, player_id) {
+    Ok(p) -> dict.insert(players, player_id, player.turn(p, direction))
+    Error(_) -> players
+  }
+}
+
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     game_message.NewTimer(timer) -> #(
@@ -157,33 +168,36 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     game_message.KeyDown(player_id, "ArrowLeft") -> {
-      let new_players = case dict.get(model.players, player_id) {
-        Ok(p) ->
-          dict.insert(model.players, player_id, player.turn(p, player.Left))
-        Error(_) -> model.players
-      }
-      #(Model(..model, players: new_players), effect.none())
+      #(
+        Model(
+          ..model,
+          players: handle_turn(model.players, player_id, player.Left),
+        ),
+        effect.none(),
+      )
     }
 
     game_message.KeyDown(player_id, "ArrowRight") -> {
-      let new_players = case dict.get(model.players, player_id) {
-        Ok(p) ->
-          dict.insert(model.players, player_id, player.turn(p, player.Right))
-        Error(_) -> model.players
-      }
-      #(Model(..model, players: new_players), effect.none())
+      #(
+        Model(
+          ..model,
+          players: handle_turn(model.players, player_id, player.Right),
+        ),
+        effect.none(),
+      )
     }
 
     game_message.KeyDown(_, _) -> #(model, effect.none())
 
     game_message.KeyUp(player_id, "ArrowLeft")
     | game_message.KeyUp(player_id, "ArrowRight") -> {
-      let new_players = case dict.get(model.players, player_id) {
-        Ok(p) ->
-          dict.insert(model.players, player_id, player.turn(p, player.Straight))
-        Error(_) -> model.players
-      }
-      #(Model(..model, players: new_players), effect.none())
+      #(
+        Model(
+          ..model,
+          players: handle_turn(model.players, player_id, player.Straight),
+        ),
+        effect.none(),
+      )
     }
 
     game_message.KeyUp(_, _) -> #(model, effect.none())
@@ -215,44 +229,14 @@ fn view(model: Model) -> Element(Msg) {
 
   let overlay_elements = case model.game_state {
     NotStarted -> {
-      let start_button =
-        svg.text(
-          [
-            attribute.attribute("x", "50%"),
-            attribute.attribute("y", "50%"),
-            attribute.attribute("text-anchor", "middle"),
-            attribute.attribute("dominant-baseline", "middle"),
-            attribute.attribute("font-size", "24"),
-            attribute.attribute("font-family", "sans-serif"),
-            attribute.attribute("fill", "black"),
-            attribute.style("cursor", "pointer"),
-            event.on_click(game_message.StartGame),
-          ],
-          "Click to Start",
-        )
-      [#("start", start_button)]
+      [overlay_text("Click to Start")]
     }
     Countdown(count) -> {
       countdown.draw(count)
     }
     Playing -> []
     Ended -> {
-      let end_text =
-        svg.text(
-          [
-            attribute.attribute("x", "50%"),
-            attribute.attribute("y", "50%"),
-            attribute.attribute("text-anchor", "middle"),
-            attribute.attribute("dominant-baseline", "middle"),
-            attribute.attribute("font-size", "24"),
-            attribute.attribute("font-family", "sans-serif"),
-            attribute.attribute("fill", "black"),
-            attribute.style("cursor", "pointer"),
-            event.on_click(game_message.StartGame),
-          ],
-          "Game Over",
-        )
-      [#("end", end_text)]
+      [overlay_text("Game Over")]
     }
   }
 
@@ -282,4 +266,23 @@ fn view(model: Model) -> Element(Msg) {
       ],
       svg_children,
     )])
+}
+
+fn overlay_text(text: String) -> #(String, Element(Msg)) {
+  let text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "50%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "24"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "black"),
+        attribute.style("cursor", "pointer"),
+        event.on_click(game_message.StartGame),
+      ],
+      text,
+    )
+  #("overlay", text_element)
 }
