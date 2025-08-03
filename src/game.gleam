@@ -15,6 +15,7 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 import player
+import position
 
 pub fn component() -> App(Nil, Model, Msg) {
   lustre.application(init, update, view)
@@ -134,8 +135,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       let p =
         player.Player(
           id: 1,
-          x: 250.0,
-          y: 250.0,
+          position: position.random_start_position(),
           speed: 0.0,
           angle: 0.0,
           tail: [],

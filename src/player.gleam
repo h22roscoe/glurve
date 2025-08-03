@@ -1,5 +1,6 @@
 import constants.{height, max_players, width}
 import game_message.{type Msg}
+import gleam/dict
 import gleam/float
 import gleam/int
 import gleam/list
@@ -8,6 +9,7 @@ import gleam_community/maths
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/svg
+import position.{type Position}
 
 const tail_radius = 3.0
 
@@ -28,8 +30,7 @@ pub type TurnDirection {
 pub type Player {
   Player(
     id: Int,
-    x: Float,
-    y: Float,
+    position: Position,
     speed: Float,
     angle: Float,
     tail: List(#(Float, Float)),
@@ -37,9 +38,28 @@ pub type Player {
   )
 }
 
+fn definite_hsl_colour(
+  hue: Float,
+  saturation: Float,
+  lightness: Float,
+) -> colour.Colour {
+  case colour.from_hsl(hue, saturation, lightness) {
+    Ok(colour) -> colour
+    Error(_) -> colour.black
+  }
+}
+
 fn id_to_colour(id: Int) -> colour.Colour {
-  let hue = int.to_float(id) /. int.to_float(max_players)
-  case colour.from_hsl(hue, 1.0, 0.5) {
+  let colours =
+    dict.new()
+    |> dict.insert(1, definite_hsl_colour(0.8611111111, 0.5, 0.9))
+    |> dict.insert(2, definite_hsl_colour(0.0, 0.5, 0.9))
+    |> dict.insert(3, definite_hsl_colour(0.3777777777, 0.5, 0.9))
+    |> dict.insert(4, definite_hsl_colour(0.7222222222, 0.5, 0.9))
+    |> dict.insert(5, definite_hsl_colour(0.222222222, 0.5, 0.9))
+    |> dict.insert(max_players, definite_hsl_colour(0.9666666666, 0.5, 0.9))
+
+  case dict.get(colours, id) {
     Ok(colour) -> colour
     Error(_) -> colour.black
   }
@@ -47,8 +67,8 @@ fn id_to_colour(id: Int) -> colour.Colour {
 
 pub fn check_collision(player: Player) -> Bool {
   let speed = player.speed
-  let head_x = player.x
-  let head_y = player.y
+  let head_x = player.position.x
+  let head_y = player.position.y
   let collision_distance = tail_radius +. tail_radius
   case speed {
     0.0 -> False
@@ -83,19 +103,24 @@ pub fn update(player: Player) -> Player {
     Straight -> player.angle
   }
 
-  let new_x = player.x +. maths.cos(angle) *. player.speed
-  let new_y = player.y +. maths.sin(angle) *. player.speed
+  let new_x = player.position.x +. maths.cos(angle) *. player.speed
+  let new_y = player.position.y +. maths.sin(angle) *. player.speed
 
   let wrapped_x = wrap(new_x, width)
 
   let wrapped_y = wrap(new_y, height)
 
-  let new_tail = [#(player.x, player.y), ..player.tail]
+  let new_tail = [#(player.position.x, player.position.y), ..player.tail]
 
   case player.speed {
     0.0 -> Player(..player, angle: angle)
     _ ->
-      Player(..player, x: wrapped_x, y: wrapped_y, angle: angle, tail: new_tail)
+      Player(
+        ..player,
+        position: position.Position(x: wrapped_x, y: wrapped_y),
+        angle: angle,
+        tail: new_tail,
+      )
   }
 }
 
@@ -124,16 +149,20 @@ pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
   let angle = player.angle
 
   // Calculate the three points of the triangle
-  let tip_x = player.x +. maths.cos(angle) *. head_size
-  let tip_y = player.y +. maths.sin(angle) *. head_size
+  let tip_x = player.position.x +. maths.cos(angle) *. head_size
+  let tip_y = player.position.y +. maths.sin(angle) *. head_size
 
   let left_angle = angle +. maths.pi() *. 2.0 /. 3.0
-  let left_x = player.x +. maths.cos(left_angle) *. { head_size /. 1.5 }
-  let left_y = player.y +. maths.sin(left_angle) *. { head_size /. 1.5 }
+  let left_x =
+    player.position.x +. maths.cos(left_angle) *. { head_size /. 1.5 }
+  let left_y =
+    player.position.y +. maths.sin(left_angle) *. { head_size /. 1.5 }
 
   let right_angle = angle -. maths.pi() *. 2.0 /. 3.0
-  let right_x = player.x +. maths.cos(right_angle) *. { head_size /. 1.5 }
-  let right_y = player.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
+  let right_x =
+    player.position.x +. maths.cos(right_angle) *. { head_size /. 1.5 }
+  let right_y =
+    player.position.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
 
   let points =
     float.to_string(tip_x)
