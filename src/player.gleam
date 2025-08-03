@@ -98,7 +98,10 @@ pub fn update(player: Player) -> Player {
   }
 }
 
-/// Draws the player to an SVG element.
+/// Draws the player by creating a list of SVG elements that represent
+/// the player's head and tail. The first element of each tuple is a string
+/// that is used as the key of the element in the list, so that we only rerender
+/// new keyed elements.
 pub fn draw(player: Player) -> List(#(String, Element(Msg))) {
   let tail_points =
     player.tail

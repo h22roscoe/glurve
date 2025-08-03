@@ -1,9 +1,10 @@
 import constants.{height, tick_delay_ms, width}
+import countdown
 import game_message.{type Msg}
+import gleam/dict
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam_community/colour
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -22,7 +23,7 @@ pub fn component() -> App(Nil, Model, Msg) {
 pub type Model {
   Model(
     game_state: GameState,
-    players: List(player.Player),
+    players: dict.Dict(Int, player.Player),
     timer: Option(game_message.TimerID),
     countdown_timer: Option(game_message.TimerID),
   )
@@ -39,7 +40,7 @@ fn init(_) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       game_state: NotStarted,
-      players: [],
+      players: dict.new(),
       timer: None,
       countdown_timer: None,
     )
@@ -98,7 +99,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     game_message.CountdownTick -> {
       let players_with_speed =
-        list.map(model.players, fn(p) { p |> player.update_speed(1.0) })
+        dict.map_values(model.players, fn(_, p) {
+          p |> player.update_speed(1.0)
+        })
 
       case model.game_state {
         Countdown(count) ->
@@ -117,7 +120,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     game_message.StartGame -> {
-      let player =
+      let p =
         player.Player(
           id: 1,
           x: 250.0,
@@ -130,7 +133,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(
         Model(
           game_state: Countdown(3),
-          players: [player],
+          players: dict.from_list([#(p.id, p)]),
           // Will be set by the NewTimer message
           timer: None,
           countdown_timer: None,
@@ -140,8 +143,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     game_message.Tick -> {
-      let new_players = list.map(model.players, player.update)
-      let collided_players = list.filter(new_players, player.check_collision)
+      let new_players =
+        dict.map_values(model.players, fn(_, p) { player.update(p) })
+      let collided_players =
+        new_players
+        |> dict.values
+        |> list.filter(player.check_collision)
 
       case collided_players {
         [] -> #(Model(..model, players: new_players), effect.none())
@@ -149,47 +156,35 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    game_message.KeyDown(player_id, "ArrowLeft") -> #(
-      Model(
-        ..model,
-        players: list.map(model.players, fn(p) {
-          case p.id == player_id {
-            True -> player.turn(p, player.Left)
-            False -> p
-          }
-        }),
-      ),
-      effect.none(),
-    )
+    game_message.KeyDown(player_id, "ArrowLeft") -> {
+      let new_players = case dict.get(model.players, player_id) {
+        Ok(p) ->
+          dict.insert(model.players, player_id, player.turn(p, player.Left))
+        Error(_) -> model.players
+      }
+      #(Model(..model, players: new_players), effect.none())
+    }
 
-    game_message.KeyDown(player_id, "ArrowRight") -> #(
-      Model(
-        ..model,
-        players: list.map(model.players, fn(p) {
-          case p.id == player_id {
-            True -> player.turn(p, player.Right)
-            False -> p
-          }
-        }),
-      ),
-      effect.none(),
-    )
+    game_message.KeyDown(player_id, "ArrowRight") -> {
+      let new_players = case dict.get(model.players, player_id) {
+        Ok(p) ->
+          dict.insert(model.players, player_id, player.turn(p, player.Right))
+        Error(_) -> model.players
+      }
+      #(Model(..model, players: new_players), effect.none())
+    }
 
     game_message.KeyDown(_, _) -> #(model, effect.none())
 
     game_message.KeyUp(player_id, "ArrowLeft")
-    | game_message.KeyUp(player_id, "ArrowRight") -> #(
-      Model(
-        ..model,
-        players: list.map(model.players, fn(p) {
-          case p.id == player_id {
-            True -> player.turn(p, player.Straight)
-            False -> p
-          }
-        }),
-      ),
-      effect.none(),
-    )
+    | game_message.KeyUp(player_id, "ArrowRight") -> {
+      let new_players = case dict.get(model.players, player_id) {
+        Ok(p) ->
+          dict.insert(model.players, player_id, player.turn(p, player.Straight))
+        Error(_) -> model.players
+      }
+      #(Model(..model, players: new_players), effect.none())
+    }
 
     game_message.KeyUp(_, _) -> #(model, effect.none())
 
@@ -216,12 +211,7 @@ fn view(model: Model) -> Element(Msg) {
       }
     })
 
-  let countdown_colour = case colour.from_hsla(1.0, 1.0, 0.0, 0.15) {
-    Ok(c) -> c
-    Error(_) -> colour.black
-  }
-
-  let player_elements = list.flat_map(model.players, player.draw)
+  let player_elements = list.flat_map(dict.values(model.players), player.draw)
 
   let overlay_elements = case model.game_state {
     NotStarted -> {
@@ -243,23 +233,7 @@ fn view(model: Model) -> Element(Msg) {
       [#("start", start_button)]
     }
     Countdown(count) -> {
-      let countdown_text =
-        svg.text(
-          [
-            attribute.attribute("x", "50%"),
-            attribute.attribute("y", "50%"),
-            attribute.attribute("text-anchor", "middle"),
-            attribute.attribute("dominant-baseline", "middle"),
-            attribute.attribute("font-size", "200"),
-            attribute.attribute("font-family", "sans-serif"),
-            attribute.attribute(
-              "fill",
-              colour.to_css_rgba_string(countdown_colour),
-            ),
-          ],
-          int.to_string(count),
-        )
-      [#("countdown", countdown_text)]
+      countdown.draw(count)
     }
     Playing -> []
     Ended -> {
