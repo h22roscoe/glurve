@@ -44,7 +44,9 @@ pub fn check_collision(player: Player) -> Bool {
   case speed {
     0.0 -> False
     _ ->
-      list.any(list.drop(player.tail, tail_collision_grace_segments), fn(pos) {
+      player.tail
+      |> list.drop(tail_collision_grace_segments)
+      |> list.any(fn(pos) {
         let #(tail_x, tail_y) = pos
         let dx = head_x -. tail_x
         let dy = head_y -. tail_y

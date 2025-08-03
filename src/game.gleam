@@ -234,10 +234,10 @@ fn view(model: Model) -> Element(Msg) {
     Countdown(count) -> {
       countdown.draw(count)
     }
-    Playing -> []
     Ended -> {
       [overlay_text("Game Over")]
     }
+    _ -> []
   }
 
   let svg_children = case model.game_state {
