@@ -28,6 +28,7 @@ pub type Model {
 
 pub type GameState {
   NotStarted
+  Countdown(Int)
   Playing
   Ended
 }
@@ -43,6 +44,19 @@ fn tick_effect() -> Effect(Msg) {
     case
       game_message.apply_interval(tick_delay_ms, fn() {
         dispatch(game_message.Tick)
+      })
+    {
+      Ok(timer) -> dispatch(game_message.NewTimer(timer))
+      Error(_) -> Nil
+    }
+  })
+}
+
+fn countdown_effect() -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    case
+      game_message.apply_interval(1000, fn() {
+        dispatch(game_message.CountdownTick)
       })
     {
       Ok(timer) -> dispatch(game_message.NewTimer(timer))
@@ -69,6 +83,23 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
 
+    game_message.CountdownTick -> {
+      case model.game_state {
+        Countdown(count) ->
+          case count {
+            1 -> #(
+              Model(..model, game_state: Playing),
+              effect.batch([cancel_timer(model.timer), tick_effect()]),
+            )
+            _ -> #(
+              Model(..model, game_state: Countdown(count - 1)),
+              effect.none(),
+            )
+          }
+        _ -> #(model, effect.none())
+      }
+    }
+
     game_message.StartGame -> {
       let player =
         player.Player(
@@ -81,12 +112,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         )
       #(
         Model(
-          game_state: Playing,
+          game_state: Countdown(3),
           players: [player],
           // Will be set by the NewTimer message
           timer: None,
         ),
-        tick_effect(),
+        countdown_effect(),
       )
     }
 
@@ -188,6 +219,22 @@ fn view(model: Model) -> Element(Msg) {
         )
       [#("start", start_button)]
     }
+    Countdown(count) -> {
+      let countdown_text =
+        svg.text(
+          [
+            attribute.attribute("x", "50%"),
+            attribute.attribute("y", "50%"),
+            attribute.attribute("text-anchor", "middle"),
+            attribute.attribute("dominant-baseline", "middle"),
+            attribute.attribute("font-size", "24"),
+            attribute.attribute("font-family", "sans-serif"),
+            attribute.attribute("fill", "black"),
+          ],
+          int.to_string(count),
+        )
+      [#("countdown", countdown_text)]
+    }
     Playing -> []
     Ended -> {
       let end_text =
@@ -211,6 +258,7 @@ fn view(model: Model) -> Element(Msg) {
 
   let svg_children = case model.game_state {
     NotStarted | Ended -> overlay_elements
+    Countdown(_) -> list.flatten([overlay_elements, player_elements])
     _ -> player_elements
   }
 
