@@ -1,6 +1,7 @@
 import game_message.{type Msg}
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -18,18 +19,16 @@ const width = 500
 
 const height = 500
 
-// ---
-// MAIN
-// ---
 pub fn component() -> App(Nil, Model, Msg) {
   lustre.application(init, update, view)
 }
 
-// ---
-// MODEL
-// ---
 pub type Model {
-  Model(game_state: GameState, players: List(player.Player))
+  Model(
+    game_state: GameState,
+    players: List(player.Player),
+    timer: Option(game_message.TimerID),
+  )
 }
 
 pub type GameState {
@@ -38,31 +37,43 @@ pub type GameState {
   Ended
 }
 
-type TimerID
-
-@external(erlang, "timer", "apply_interval")
-fn apply_interval(
-  delay_ms: Int,
-  callback: fn() -> any,
-) -> Result(TimerID, String)
-
 fn init(_) -> #(Model, Effect(Msg)) {
-  let model = Model(game_state: NotStarted, players: [])
+  let model = Model(game_state: NotStarted, players: [], timer: None)
 
   #(model, effect.none())
 }
 
 fn tick_effect() -> Effect(Msg) {
   effect.from(fn(dispatch) {
-    case apply_interval(tick_delay_ms, fn() { dispatch(game_message.Tick) }) {
-      Ok(_) -> Nil
+    case
+      game_message.apply_interval(tick_delay_ms, fn() {
+        dispatch(game_message.Tick)
+      })
+    {
+      Ok(timer) -> dispatch(game_message.NewTimer(timer))
       Error(_) -> Nil
     }
   })
 }
 
+fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(Msg) {
+  case timer {
+    Some(timer) ->
+      effect.from(fn(dispatch) {
+        let _ = game_message.cancel(timer)
+        dispatch(game_message.NoOp)
+      })
+    None -> effect.none()
+  }
+}
+
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
-  let new_model = case msg {
+  case msg {
+    game_message.NewTimer(timer) -> #(
+      Model(..model, timer: Some(timer)),
+      effect.none(),
+    )
+
     game_message.StartGame -> {
       let player =
         player.Player(
@@ -73,7 +84,15 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
           tail: [],
           turning: player.Straight,
         )
-      Model(game_state: Playing, players: [player])
+      #(
+        Model(
+          game_state: Playing,
+          players: [player],
+          // Will be set by the NewTimer message
+          timer: None,
+        ),
+        tick_effect(),
+      )
     }
 
     game_message.Tick -> {
@@ -81,62 +100,59 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       let collided_players = list.filter(new_players, player.check_collision)
 
       case collided_players {
-        [] -> Model(..model, players: new_players)
-        _ -> Model(..model, game_state: Ended)
+        [] -> #(Model(..model, players: new_players), effect.none())
+        _ -> #(Model(..model, game_state: Ended), cancel_timer(model.timer))
       }
     }
 
-    game_message.KeyDown(player_id, "ArrowLeft") ->
+    game_message.KeyDown(player_id, "ArrowLeft") -> #(
       Model(
         ..model,
-        players: list.map(model.players, fn(player) {
-          case player.id == player_id {
-            True -> player.turn(player, player.Left)
-            False -> player
+        players: list.map(model.players, fn(p) {
+          case p.id == player_id {
+            True -> player.turn(p, player.Left)
+            False -> p
           }
         }),
-      )
-    game_message.KeyDown(player_id, "ArrowRight") ->
+      ),
+      effect.none(),
+    )
+
+    game_message.KeyDown(player_id, "ArrowRight") -> #(
       Model(
         ..model,
-        players: list.map(model.players, fn(player) {
-          case player.id == player_id {
-            True -> player.turn(player, player.Right)
-            False -> player
+        players: list.map(model.players, fn(p) {
+          case p.id == player_id {
+            True -> player.turn(p, player.Right)
+            False -> p
           }
         }),
-      )
-    game_message.KeyDown(_, _) -> model
+      ),
+      effect.none(),
+    )
+
+    game_message.KeyDown(_, _) -> #(model, effect.none())
 
     game_message.KeyUp(player_id, "ArrowLeft")
-    | game_message.KeyUp(player_id, "ArrowRight") ->
+    | game_message.KeyUp(player_id, "ArrowRight") -> #(
       Model(
         ..model,
-        players: list.map(model.players, fn(player) {
-          case player.id == player_id {
-            True -> player.turn(player, player.Straight)
-            False -> player
+        players: list.map(model.players, fn(p) {
+          case p.id == player_id {
+            True -> player.turn(p, player.Straight)
+            False -> p
           }
         }),
-      )
-    game_message.KeyUp(_, _) -> model
+      ),
+      effect.none(),
+    )
 
-    game_message.NoOp -> model
-  }
+    game_message.KeyUp(_, _) -> #(model, effect.none())
 
-  case msg {
-    game_message.StartGame -> {
-      #(new_model, tick_effect())
-    }
-    _ -> {
-      #(new_model, effect.none())
-    }
+    game_message.NoOp -> #(model, effect.none())
   }
 }
 
-// ---
-// VIEW
-// ---
 fn view(model: Model) -> Element(Msg) {
   let on_key_down =
     event.on_keydown(fn(key) {
