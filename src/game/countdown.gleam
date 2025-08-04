@@ -1,4 +1,4 @@
-import game_message.{type Msg}
+import game/game_message.{type Msg}
 import gleam/int
 import gleam_community/colour
 import lustre/attribute

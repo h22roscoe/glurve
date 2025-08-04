@@ -1,6 +1,6 @@
 import constants.{height, tick_delay_ms, width}
-import countdown
-import game_message.{type Msg}
+import game/countdown
+import game/game_message.{type Msg}
 import gleam/dict
 import gleam/erlang/process
 import gleam/float

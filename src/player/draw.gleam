@@ -1,4 +1,4 @@
-import game_message.{type Msg}
+import game/game_message.{type Msg}
 import gleam/float
 import gleam/int
 import gleam/list

@@ -1,14 +1,12 @@
-import game
-import game_message.{type Msg}
+import game/game_message
+import game/game_socket
 import gleam/bytes_tree
 import gleam/erlang/application
-import gleam/erlang/process.{type Selector, type Subject}
+import gleam/erlang/process
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
-import gleam/json
-import gleam/option.{type Option, None, Some}
+import gleam/option.{None}
 import glubsub
-import lustre
 import lustre/attribute
 import lustre/element
 import lustre/element/html.{html}
@@ -92,80 +90,8 @@ fn serve_game(
 ) -> Response(ResponseData) {
   mist.websocket(
     request:,
-    on_init: init_game_socket(_, topic),
-    handler: loop_game_socket,
-    on_close: close_game_socket,
+    on_init: game_socket.init_game_socket(_, topic),
+    handler: game_socket.loop_game_socket,
+    on_close: game_socket.close_game_socket,
   )
-}
-
-type GameSocket {
-  GameSocket(
-    component: lustre.Runtime(Msg),
-    self: Subject(server_component.ClientMessage(Msg)),
-  )
-}
-
-type GameSocketMessage =
-  server_component.ClientMessage(Msg)
-
-type GameSocketInit =
-  #(GameSocket, Option(Selector(GameSocketMessage)))
-
-fn init_game_socket(
-  _,
-  topic: glubsub.Topic(game_message.SharedMsg),
-) -> GameSocketInit {
-  let game = game.component()
-
-  let id = game.glurve_id()
-  let assert Ok(component) =
-    lustre.start_server_component(game, game.StartArgs(id:, topic:))
-
-  let self = process.new_subject()
-  let selector = process.new_selector() |> process.select(self)
-
-  server_component.register_subject(self)
-  |> lustre.send(to: component)
-
-  #(GameSocket(component:, self:), Some(selector))
-}
-
-fn loop_game_socket(
-  state: GameSocket,
-  message: mist.WebsocketMessage(GameSocketMessage),
-  connection: mist.WebsocketConnection,
-) -> mist.Next(GameSocket, GameSocketMessage) {
-  case message {
-    mist.Text(json) -> {
-      case json.parse(json, server_component.runtime_message_decoder()) {
-        Ok(runtime_message) -> lustre.send(state.component, runtime_message)
-        Error(_) -> Nil
-      }
-
-      mist.continue(state)
-    }
-
-    mist.Binary(_) -> {
-      mist.continue(state)
-    }
-
-    mist.Custom(client_message) -> {
-      let json = server_component.client_message_to_json(client_message)
-      let assert Ok(_) = mist.send_text_frame(connection, json.to_string(json))
-
-      mist.continue(state)
-    }
-
-    mist.Closed | mist.Shutdown -> {
-      server_component.deregister_subject(state.self)
-      |> lustre.send(to: state.component)
-
-      mist.stop()
-    }
-  }
-}
-
-fn close_game_socket(state: GameSocket) -> Nil {
-  server_component.deregister_subject(state.self)
-  |> lustre.send(to: state.component)
 }
