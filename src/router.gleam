@@ -19,8 +19,8 @@ pub fn handle_request(
     use req <- middleware(request)
 
     case wisp.path_segments(req) {
+      [] -> serve_lobby_html(req)
       ["game", game_id] -> serve_game_html(req, game_id)
-      ["lobby"] -> serve_lobby_html(req)
       ["create-game", game_name] ->
         handle_create_game(req, game_name, lobby_manager_subject)
       ["join-game", game_id] ->
@@ -173,7 +173,7 @@ fn serve_lobby_html(req: Request) -> Response {
     req,
     "glurve_user_id",
     glurve_user_id(),
-    wisp.Signed,
+    wisp.PlainText,
     // 30 days
     60 * 60 * 24 * 30,
   )
@@ -185,9 +185,9 @@ fn serve_runtime(req: Request) -> Response {
   use <- wisp.require_method(req, http.Get)
 
   let assert Ok(file_path) = application.priv_directory("lustre")
-  let file_name = "/static/lustre-server-component.min.mjs"
+  let file_path = file_path <> "/static/lustre-server-component.min.mjs"
 
   wisp.ok()
   |> wisp.set_header("content-type", "application/javascript")
-  |> wisp.file_download(named: file_name, from: file_path)
+  |> wisp.file_download(named: file_path, from: file_path)
 }
