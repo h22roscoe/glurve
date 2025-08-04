@@ -186,6 +186,7 @@ fn handle_shared_msg(
       ),
       broadcast(model.topic, game_message.ExistingPlayer(model.player_id)),
     )
+
     game_message.ExistingPlayer(player_id) -> #(
       Model(
         ..model,
@@ -205,6 +206,7 @@ fn handle_shared_msg(
       ),
       effect.none(),
     )
+
     game_message.PlayerCrashed(player_id) -> {
       let assert Ok(that_player) = dict.get(model.players, player_id)
       let that_player_crashed = player.Player(..that_player, speed: 0.0)
@@ -226,6 +228,7 @@ fn handle_shared_msg(
         False -> #(Model(..model, players: new_players), effect.none())
       }
     }
+
     game_message.StartedGame -> {
       let num_players = dict.size(model.players)
       let positions =
@@ -251,6 +254,7 @@ fn handle_shared_msg(
         effect.batch([countdown_effect(), tick_effect()]),
       )
     }
+
     game_message.PlayerTurning(player_id, direction) -> {
       case player_id == model.player_id {
         True -> #(model, effect.none())
@@ -385,10 +389,10 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
 
     game_message.KeyUp(_) -> #(model, effect.none())
 
-    game_message.ReturnToLobby -> {
-      echo "ReturnToLobby"
-      #(model, server_component.emit("navigate", json.string("/")))
-    }
+    game_message.ReturnToLobby -> #(
+      model,
+      server_component.emit("navigate", json.string("/")),
+    )
 
     game_message.NoOp -> #(model, effect.none())
   }
