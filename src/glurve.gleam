@@ -1,4 +1,3 @@
-import game/game_message
 import game/game_socket
 import gleam/bytes_tree
 import gleam/erlang/application
@@ -10,8 +9,10 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/list
 import gleam/option.{None, Some}
-import glubsub
 import gluid
+import lobby/lobby_manager
+import lobby/lobby_socket
+import lobby/lobby_socket
 import lustre/attribute
 import lustre/element
 import lustre/element/html.{html}
@@ -21,14 +22,16 @@ import mist.{type Connection, type ResponseData}
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
-  let assert Ok(topic) = glubsub.new_topic()
+  let lobby_manager_subject = process.new_subject()
 
   let assert Ok(_) =
     fn(request: Request(Connection)) -> Response(ResponseData) {
       case request.path_segments(request) {
-        [] -> serve_html(request)
+        [] -> serve_lobby_html(request)
+        [game_id] -> serve_game_html(request, game_id)
         ["lustre", "runtime.mjs"] -> serve_runtime()
-        ["ws"] -> serve_game(request, topic)
+        ["ws"] -> serve_lobby(request, lobby_manager_subject)
+        ["ws", game_id] -> serve_game(request, game_id, lobby_manager_subject)
         _ -> response.set_body(response.new(404), mist.Bytes(bytes_tree.new()))
       }
     }
@@ -46,7 +49,10 @@ fn glurve_user_id() -> String {
 
 // HTML ------------------------------------------------------------------------
 
-fn serve_html(request: Request(Connection)) -> Response(ResponseData) {
+fn serve_game_html(
+  request: Request(Connection),
+  game_id: String,
+) -> Response(ResponseData) {
   let possible_user_id =
     request.get_cookies(request)
     |> list.fold(None, fn(acc, c) {
@@ -83,7 +89,10 @@ fn serve_html(request: Request(Connection)) -> Response(ResponseData) {
         ),
       ]),
       html.body([attribute.style("height", "100dvh")], [
-        server_component.element([server_component.route("/ws")], []),
+        server_component.element(
+          [server_component.route("/ws/" <> game_id)],
+          [],
+        ),
       ]),
     ])
     |> element.to_document_string_tree
@@ -93,6 +102,10 @@ fn serve_html(request: Request(Connection)) -> Response(ResponseData) {
   |> response.set_body(mist.Bytes(html))
   |> response.set_header("content-type", "text/html")
   |> add_cookie
+}
+
+fn serve_lobby_html(request: Request(Connection)) -> Response(ResponseData) {
+  todo
 }
 
 // JAVASCRIPT ------------------------------------------------------------------
@@ -117,8 +130,12 @@ fn serve_runtime() -> Response(ResponseData) {
 
 fn serve_game(
   request: Request(Connection),
-  topic: glubsub.Topic(game_message.SharedMsg),
+  game_id: String,
+  lobby_manager_subject: process.Subject(lobby_socket.LobbySocketMessage),
 ) -> Response(ResponseData) {
+  let assert Some(game_info) =
+    lobby_manager.get_game(lobby_manager_subject, game_id)
+
   let assert Some(user_id) =
     request.get_cookies(request)
     |> list.fold(None, fn(acc, c) {
@@ -131,8 +148,20 @@ fn serve_game(
 
   mist.websocket(
     request:,
-    on_init: game_socket.init_game_socket(_, user_id, topic),
+    on_init: game_socket.init_game_socket(_, user_id, game_info.topic),
     handler: game_socket.loop_game_socket,
     on_close: game_socket.close_game_socket,
+  )
+}
+
+fn serve_lobby(
+  request: Request(Connection),
+  lobby_manager_subject: process.Subject(lobby_socket.LobbySocketMessage),
+) -> Response(ResponseData) {
+  mist.websocket(
+    request:,
+    on_init: lobby_socket.init_lobby_socket(_, lobby_manager_subject),
+    handler: lobby_socket.loop_lobby_socket,
+    on_close: lobby_socket.close_lobby_socket,
   )
 }

@@ -1,5 +1,5 @@
 import game/game
-import game/game_message.{type Msg}
+import game/game_message.{type GameMsg}
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
@@ -10,13 +10,13 @@ import mist
 
 pub type GameSocket {
   GameSocket(
-    component: lustre.Runtime(Msg),
-    self: Subject(server_component.ClientMessage(Msg)),
+    component: lustre.Runtime(GameMsg),
+    self: Subject(server_component.ClientMessage(GameMsg)),
   )
 }
 
 pub type GameSocketMessage =
-  server_component.ClientMessage(Msg)
+  server_component.ClientMessage(GameMsg)
 
 pub type GameSocketInit =
   #(GameSocket, Option(Selector(GameSocketMessage)))
