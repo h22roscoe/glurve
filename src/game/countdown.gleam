@@ -1,11 +1,11 @@
-import game/game_message.{type Msg}
+import game/game_message.{type GameMsg}
 import gleam/int
 import gleam_community/colour
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/svg
 
-pub fn draw(count: Int) -> List(#(String, Element(Msg))) {
+pub fn draw(count: Int) -> List(#(String, Element(GameMsg))) {
   let countdown_colour = case colour.from_hsla(1.0, 1.0, 0.0, 0.15) {
     Ok(c) -> c
     Error(_) -> colour.black

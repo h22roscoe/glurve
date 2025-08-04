@@ -1,5 +1,5 @@
 import game/countdown
-import game/game_message.{type Msg}
+import game/game_message.{type GameMsg}
 import gleam/dict
 import gleam/erlang/process
 import gleam/float
@@ -33,7 +33,7 @@ pub type StartArgs {
   StartArgs(id: String, topic: glubsub.Topic(game_message.SharedMsg))
 }
 
-pub fn component() -> App(StartArgs, Model, Msg) {
+pub fn component() -> App(StartArgs, Model, GameMsg) {
   lustre.application(init, update, view)
 }
 
@@ -75,7 +75,7 @@ fn subscribe(
   selector
 }
 
-fn init(start_args: StartArgs) -> #(Model, Effect(Msg)) {
+fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
   let this_player =
     player.Player(
       id: start_args.id,
@@ -107,7 +107,7 @@ fn init(start_args: StartArgs) -> #(Model, Effect(Msg)) {
   )
 }
 
-fn tick_effect() -> Effect(Msg) {
+fn tick_effect() -> Effect(GameMsg) {
   effect.from(fn(dispatch) {
     case
       game_message.apply_interval(tick_delay_ms, fn() {
@@ -120,7 +120,7 @@ fn tick_effect() -> Effect(Msg) {
   })
 }
 
-fn countdown_effect() -> Effect(Msg) {
+fn countdown_effect() -> Effect(GameMsg) {
   effect.from(fn(dispatch) {
     case
       game_message.apply_interval(1000, fn() {
@@ -133,7 +133,7 @@ fn countdown_effect() -> Effect(Msg) {
   })
 }
 
-fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(Msg) {
+fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(GameMsg) {
   case timer {
     Some(timer) ->
       effect.from(fn(dispatch) {
@@ -164,7 +164,7 @@ fn handle_turn(
 fn handle_shared_msg(
   model: Model,
   shared_msg: game_message.SharedMsg,
-) -> #(Model, Effect(Msg)) {
+) -> #(Model, Effect(GameMsg)) {
   case shared_msg {
     game_message.PlayerJoined(player_id) -> #(
       Model(
@@ -265,7 +265,7 @@ fn handle_shared_msg(
   }
 }
 
-fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
   case msg {
     game_message.NewTimer(timer) -> #(
       Model(..model, timer: Some(timer)),
@@ -388,7 +388,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-fn view(model: Model) -> Element(Msg) {
+fn view(model: Model) -> Element(GameMsg) {
   let on_key_down =
     event.on_keydown(fn(key) {
       case key {
@@ -520,7 +520,7 @@ fn overlay_text_with_index(
   text: String,
   idx: Int,
   total: Int,
-) -> #(String, Element(Msg)) {
+) -> #(String, Element(GameMsg)) {
   let offset = 50.0
   let spacing = 50.0
   let percentage =

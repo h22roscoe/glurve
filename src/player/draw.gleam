@@ -1,4 +1,4 @@
-import game/game_message.{type Msg}
+import game/game_message.{type GameMsg}
 import gleam/float
 import gleam/int
 import gleam/list
@@ -15,7 +15,7 @@ const head_size = 10.0
 /// the player's head and tail. The first element of each tuple is a string
 /// that is used as the key of the element in the list, so that we only rerender
 /// new keyed elements.
-pub fn draw_player(player: player.Player) -> List(#(String, Element(Msg))) {
+pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
   let colour = player.colour
   let tail_points =
     player.tail

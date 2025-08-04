@@ -11,7 +11,7 @@ pub fn apply_interval(
   callback: fn() -> any,
 ) -> Result(TimerID, String)
 
-pub type Msg {
+pub type GameMsg {
   RecievedSharedMsg(SharedMsg)
   KickOffGame
   NewTimer(TimerID)
