@@ -28,6 +28,7 @@ pub fn handle_request(
       [] -> serve_lobby_html(req)
       ["game", game_id] -> serve_game_html(req, game_id)
       ["create-game", game_name] -> handle_create_game(req, game_name, lobby)
+      ["start-game", game_id] -> handle_start_game(req, game_id, lobby)
       ["join-game", game_id] -> handle_join_game(req, game_id, lobby)
       ["leave-game"] -> handle_leave_game(req, lobby)
       ["list-games"] -> handle_list_games(req, lobby)
@@ -113,6 +114,15 @@ fn handle_join_game(
     }
     Error(_) -> wisp.bad_request()
   }
+}
+
+fn handle_start_game(
+  _request: Request,
+  game_id: String,
+  lobby: actor.Started(process.Subject(lobby_actor.Message)),
+) -> Response {
+  lobby_actor.start_game(lobby.data, game_id)
+  wisp.ok()
 }
 
 fn handle_leave_game(
@@ -206,7 +216,6 @@ fn serve_game_html(_req: Request, game_id: String) -> Response {
         const glurve = document.querySelector('lustre-server-component');
 
         glurve.addEventListener('navigate', (event) => {
-          console.log('navigate', event);
           window.location.href = event.detail;
         });
         ",

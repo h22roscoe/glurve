@@ -61,6 +61,7 @@ pub type Message {
     game_id: String,
     reply_with: process.Subject(Result(GameInfo, String)),
   )
+  StartGame(game_id: String)
   GetGame(game_id: String, reply_with: process.Subject(option.Option(GameInfo)))
   LeaveGame(player_id: String, reply_with: process.Subject(Result(Nil, String)))
   ListGames(reply_with: process.Subject(List(GameInfo)))
@@ -107,6 +108,11 @@ fn handle_message(state: State, message: Message) -> actor.Next(State, Message) 
 
     JoinGame(player_id, game_id, reply_with) -> {
       let new_state = handle_join_game(state, player_id, game_id, reply_with)
+      actor.continue(new_state)
+    }
+
+    StartGame(game_id) -> {
+      let new_state = handle_start_game(state, game_id)
       actor.continue(new_state)
     }
 
@@ -243,6 +249,20 @@ fn handle_join_game(
   }
 }
 
+fn handle_start_game(state: State, game_id: String) -> State {
+  let game_info = dict.get(state.games, game_id)
+  case game_info {
+    Ok(game_info) -> {
+      let updated_game = GameInfo(..game_info, status: Playing)
+      let new_games = dict.insert(state.games, game_id, updated_game)
+      State(..state, games: new_games)
+    }
+    Error(_) -> {
+      state
+    }
+  }
+}
+
 fn handle_get_game(
   state: State,
   game_id: String,
@@ -364,6 +384,13 @@ pub fn join_game(
   game_id: String,
 ) -> Result(GameInfo, String) {
   actor.call(actor_subject, 5000, JoinGame(player_id, game_id, _))
+}
+
+pub fn start_game(
+  actor_subject: process.Subject(Message),
+  game_id: String,
+) -> Nil {
+  actor.send(actor_subject, StartGame(game_id))
 }
 
 pub fn leave_game(

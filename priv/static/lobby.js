@@ -127,7 +127,8 @@ async function joinGame(gameId) {
 }
 
 // Enter a game (navigate to game page)
-function enterGame(gameId) {
+async function enterGame(gameId) {
+  await fetch(`/start-game/${gameId}`);
   window.location.href = `/game/${gameId}`;
 }
 
