@@ -101,7 +101,7 @@ async function loadCurrentPlayerGame() {
       `;
     } else {
       currentGameId = null;
-      currentGameInfo.innerHTML = '';
+      currentGameInfo.innerHTML = '<p style=\"color: #718096\">Join a game to start playing!</p>';
     }
   } catch (error) {
     console.error('Error loading current player game:', error);

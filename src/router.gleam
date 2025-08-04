@@ -285,8 +285,11 @@ fn serve_lobby_html(req: Request) -> Response {
               ),
             ]),
             html.div([attribute.class("section")], [
-              html.h2([], [html.text("Available Games")]),
+              html.h2([], [html.text("Current Game")]),
               html.div([attribute.id("current-game-info")], []),
+            ]),
+            html.div([attribute.class("section")], [
+              html.h2([], [html.text("Available Games")]),
               html.div(
                 [attribute.id("games-list"), attribute.class("game-list")],
                 [
