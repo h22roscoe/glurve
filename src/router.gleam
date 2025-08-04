@@ -12,7 +12,6 @@ import lustre/server_component
 import wisp.{type Request, type Response}
 
 pub fn handle_request(
-  lobby_manager: process.Pid,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> fn(Request) -> Response {
   fn(request) {

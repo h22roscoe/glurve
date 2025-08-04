@@ -16,12 +16,12 @@ pub fn main() {
   wisp.configure_logger()
 
   let lobby_manager_subject = process.new_subject()
-  let lobby_manager = lobby_manager.start(lobby_manager_subject)
+  let _lobby_manager = lobby_manager.start(lobby_manager_subject)
 
   let secret_key_base = "glurve"
 
   let wisp_handler =
-    router.handle_request(lobby_manager, lobby_manager_subject)
+    router.handle_request(lobby_manager_subject)
     |> wisp_mist.handler(secret_key_base)
 
   let overall_handler = fn(req: request.Request(mist.Connection)) -> response.Response(
