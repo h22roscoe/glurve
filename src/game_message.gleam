@@ -1,3 +1,5 @@
+import player/player.{type TurnDirection}
+
 pub type TimerID
 
 @external(erlang, "timer", "cancel")
@@ -10,12 +12,21 @@ pub fn apply_interval(
 ) -> Result(TimerID, String)
 
 pub type Msg {
+  RecievedSharedMsg(SharedMsg)
+  KickOffGame
   NewTimer(TimerID)
   NewCountdownTimer(TimerID)
-  StartGame
   CountdownTick
   Tick
-  KeyDown(Int, String)
-  KeyUp(Int, String)
+  KeyDown(String)
+  KeyUp(String)
   NoOp
+}
+
+pub type SharedMsg {
+  PlayerJoined(String)
+  ExistingPlayer(String)
+  PlayerCrashed(String)
+  StartedGame
+  PlayerTurning(String, TurnDirection)
 }
