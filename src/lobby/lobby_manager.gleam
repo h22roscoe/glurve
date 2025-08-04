@@ -1,6 +1,7 @@
 import game/game_message
 import gleam/dict.{type Dict}
 import gleam/erlang/process
+import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -18,6 +19,16 @@ pub type GameInfo {
   )
 }
 
+pub fn game_info_to_json(game_info: GameInfo) -> Json {
+  json.object([
+    #("id", json.string(game_info.id)),
+    #("name", json.string(game_info.name)),
+    #("player_count", json.int(game_info.player_count)),
+    #("max_players", json.int(game_info.max_players)),
+    #("status", json.string(game_status_to_string(game_info.status))),
+  ])
+}
+
 pub type GameStatus {
   // In lobby, waiting for players
   Waiting
@@ -25,6 +36,14 @@ pub type GameStatus {
   Playing
   // Game has finished
   Finished
+}
+
+pub fn game_status_to_string(status: GameStatus) -> String {
+  case status {
+    Waiting -> "Waiting"
+    Playing -> "Playing"
+    Finished -> "Finished"
+  }
 }
 
 pub type LobbyManagerState {

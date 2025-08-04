@@ -26,6 +26,7 @@ prng = ">= 4.0.1 and < 5.0.0"
 gleam_yielder = ">= 1.1.0 and < 2.0.0"
 glubsub = ">= 1.2.0 and < 2.0.0"
 gluid = ">= 1.1.0 and < 2.0.0"
+wisp = ">= 1.8.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
