@@ -2,6 +2,8 @@ import gleam/erlang/application
 import gleam/erlang/process
 import gleam/http
 import gleam/json
+import gleam/list
+import gleam/option.{None, Some}
 import gleam/string_tree
 import gluid
 import lobby/lobby_manager
@@ -92,36 +94,91 @@ fn handle_join_game(
   game_id: String,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> Response {
-  todo
+  case wisp.get_cookie(request, "glurve_user_id", wisp.Signed) {
+    Ok(user_id) -> {
+      let joined =
+        lobby_manager.join_game(lobby_manager_subject, user_id, game_id)
+      case joined {
+        Ok(game_info) -> {
+          let res =
+            lobby_manager.game_info_to_json(game_info)
+            |> json.to_string
+            |> string_tree.from_string
+
+          wisp.json_response(res, 200)
+        }
+        Error(_error) -> wisp.bad_request()
+      }
+    }
+    Error(_) -> wisp.bad_request()
+  }
 }
 
 fn handle_leave_game(
   request: Request,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> Response {
-  todo
+  case wisp.get_cookie(request, "glurve_user_id", wisp.Signed) {
+    Ok(user_id) -> {
+      let left = lobby_manager.leave_game(lobby_manager_subject, user_id)
+      case left {
+        Ok(_) -> wisp.json_response(string_tree.from_string("{}"), 200)
+        Error(_error) -> wisp.bad_request()
+      }
+    }
+    Error(_) -> wisp.bad_request()
+  }
 }
 
 fn handle_list_games(
-  request: Request,
+  _request: Request,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> Response {
-  todo
+  let games = lobby_manager.list_games(lobby_manager_subject)
+  let games_json =
+    games
+    |> list.map(lobby_manager.game_info_to_json)
+    |> json.array(fn(x) { x })
+    |> json.to_string
+    |> string_tree.from_string
+
+  wisp.json_response(games_json, 200)
 }
 
 fn handle_get_player_game(
   request: Request,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> Response {
-  todo
+  case wisp.get_cookie(request, "glurve_user_id", wisp.Signed) {
+    Ok(user_id) -> {
+      let player_game =
+        lobby_manager.get_player_game(lobby_manager_subject, user_id)
+      case player_game {
+        Some(game_info) -> {
+          let res =
+            lobby_manager.game_info_to_json(game_info)
+            |> json.to_string
+            |> string_tree.from_string
+
+          wisp.json_response(res, 200)
+        }
+        None -> wisp.json_response(string_tree.from_string("null"), 200)
+      }
+    }
+    Error(_) -> wisp.bad_request()
+  }
 }
 
 fn handle_player_disconnected(
-  request: Request,
+  _request: Request,
   player_id: String,
   lobby_manager_subject: process.Subject(lobby_manager.LobbyManagerMsg),
 ) -> Response {
-  todo
+  process.send(
+    lobby_manager_subject,
+    lobby_manager.PlayerDisconnected(player_id),
+  )
+  wisp.json_response(string_tree.from_string("{}"), 200)
 }
 
 // HTML ------------------------------------------------------------------------
