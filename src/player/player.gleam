@@ -1,4 +1,3 @@
-import constants.{height, width}
 import gleam/dict
 import gleam/int
 import gleam/list
@@ -52,7 +51,11 @@ pub fn check_collision_with_self(player: Player) -> Bool {
   }
 }
 
-pub fn check_collision_with_edges(player: Player) -> Bool {
+pub fn check_collision_with_edges(
+  player: Player,
+  height: Int,
+  width: Int,
+) -> Bool {
   let head_x = player.position.x
   let head_y = player.position.y
   head_x <=. 0.0
@@ -101,7 +104,7 @@ pub fn update_speed(player: Player, speed: Float) -> Player {
 }
 
 /// Returns a new player with the updated position and tail based on a game tick.
-pub fn update(player: Player) -> Player {
+pub fn update(player: Player, height: Int, width: Int) -> Player {
   let angle = case player.turning {
     Left -> player.angle -. turn_rate
     Right -> player.angle +. turn_rate

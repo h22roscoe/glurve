@@ -1,4 +1,3 @@
-import constants.{height, tick_delay_ms, width}
 import game/countdown
 import game/game_message.{type Msg}
 import gleam/dict
@@ -24,6 +23,12 @@ import player/draw
 import player/player
 import position
 import uuid_colour
+
+const height = 500
+
+const width = 500
+
+const tick_delay_ms = 10
 
 pub type StartArgs {
   StartArgs(id: String, topic: glubsub.Topic(game_message.SharedMsg))
@@ -79,7 +84,7 @@ fn init(start_args: StartArgs) -> #(Model, Effect(Msg)) {
   let this_player =
     player.Player(
       id: start_args.id,
-      position: position.random_start_position()
+      position: position.random_start_position(height, width)
         |> yielder.first()
         |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
       speed: 0.0,
@@ -228,7 +233,7 @@ fn handle_shared_msg(
     game_message.StartedGame -> {
       let num_players = dict.size(model.players)
       let positions =
-        yielder.take(position.random_start_position(), num_players)
+        yielder.take(position.random_start_position(height, width), num_players)
         |> yielder.to_list()
       let players =
         dict.to_list(model.players)
@@ -309,12 +314,14 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     game_message.Tick -> {
       let new_players =
-        dict.map_values(model.players, fn(_, p) { player.update(p) })
+        dict.map_values(model.players, fn(_, p) {
+          player.update(p, height, width)
+        })
       let assert Ok(this_player) = dict.get(new_players, model.player_id)
       let player_collided_with_self =
         player.check_collision_with_self(this_player)
       let player_collided_with_edges =
-        player.check_collision_with_edges(this_player)
+        player.check_collision_with_edges(this_player, height, width)
       let players_collided_with_other_players =
         player.check_collision_with_other_players(this_player, new_players)
       let player_collided =

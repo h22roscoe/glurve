@@ -1,4 +1,3 @@
-import constants.{height, width}
 import gleam/int
 import gleam/yielder.{type Yielder}
 import prng/random.{type Generator}
@@ -8,7 +7,7 @@ pub type Position {
   Position(x: Float, y: Float)
 }
 
-pub fn random_start_position() -> Yielder(Position) {
+pub fn random_start_position(height: Int, width: Int) -> Yielder(Position) {
   let initial_seed = seed.new(1)
   let width_generator: Generator(Int) = random.int(0, width - 1)
   let height_generator: Generator(Int) = random.int(0, height - 1)
