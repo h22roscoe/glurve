@@ -565,15 +565,22 @@ fn serve_lobby_html(req: Request) -> Response {
     ])
     |> element.to_document_string_tree
 
-  wisp.html_response(html, 200)
-  |> wisp.set_cookie(
-    req,
-    "glurve_user_id",
-    glurve_user_id(),
-    wisp.PlainText,
-    // 30 days
-    60 * 60 * 24 * 30,
-  )
+  case wisp.get_cookie(req, "glurve_user_id", wisp.PlainText) {
+    Ok(_) -> {
+      wisp.html_response(html, 200)
+    }
+    Error(_) -> {
+      wisp.html_response(html, 200)
+      |> wisp.set_cookie(
+        req,
+        "glurve_user_id",
+        glurve_user_id(),
+        wisp.PlainText,
+        // 30 days
+        60 * 60 * 24 * 30,
+      )
+    }
+  }
 }
 
 // JAVASCRIPT ------------------------------------------------------------------
