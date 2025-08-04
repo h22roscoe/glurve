@@ -9,7 +9,6 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/yielder
 import glubsub
-import gluid
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -36,10 +35,6 @@ pub type StartArgs {
 
 pub fn component() -> App(StartArgs, Model, Msg) {
   lustre.application(init, update, view)
-}
-
-pub fn glurve_id() -> String {
-  gluid.guidv4()
 }
 
 pub type Model {

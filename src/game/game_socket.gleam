@@ -23,11 +23,11 @@ pub type GameSocketInit =
 
 pub fn init_game_socket(
   _,
+  id: String,
   topic: glubsub.Topic(game_message.SharedMsg),
 ) -> GameSocketInit {
   let game = game.component()
 
-  let id = game.glurve_id()
   let assert Ok(component) =
     lustre.start_server_component(game, game.StartArgs(id:, topic:))
 

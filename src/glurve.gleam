@@ -3,10 +3,15 @@ import game/game_socket
 import gleam/bytes_tree
 import gleam/erlang/application
 import gleam/erlang/process
+import gleam/function
+import gleam/http.{Https}
+import gleam/http/cookie
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
-import gleam/option.{None}
+import gleam/list
+import gleam/option.{None, Some}
 import glubsub
+import gluid
 import lustre/attribute
 import lustre/element
 import lustre/element/html.{html}
@@ -21,7 +26,7 @@ pub fn main() {
   let assert Ok(_) =
     fn(request: Request(Connection)) -> Response(ResponseData) {
       case request.path_segments(request) {
-        [] -> serve_html()
+        [] -> serve_html(request)
         ["lustre", "runtime.mjs"] -> serve_runtime()
         ["ws"] -> serve_game(request, topic)
         _ -> response.set_body(response.new(404), mist.Bytes(bytes_tree.new()))
@@ -35,9 +40,34 @@ pub fn main() {
   process.sleep_forever()
 }
 
+fn glurve_user_id() -> String {
+  gluid.guidv4()
+}
+
 // HTML ------------------------------------------------------------------------
 
-fn serve_html() -> Response(ResponseData) {
+fn serve_html(request: Request(Connection)) -> Response(ResponseData) {
+  let possible_user_id =
+    request.get_cookies(request)
+    |> list.fold(None, fn(acc, c) {
+      case c {
+        #("glurve_user_id", id) -> Some(id)
+        _ -> acc
+      }
+    })
+
+  let add_cookie = case possible_user_id {
+    None -> fn(res) -> Response(ResponseData) {
+      response.set_cookie(
+        res,
+        "glurve_user_id",
+        glurve_user_id(),
+        cookie.defaults(Https),
+      )
+    }
+    Some(_) -> function.identity
+  }
+
   let html =
     html([attribute.lang("en")], [
       html.head([], [
@@ -62,6 +92,7 @@ fn serve_html() -> Response(ResponseData) {
   response.new(200)
   |> response.set_body(mist.Bytes(html))
   |> response.set_header("content-type", "text/html")
+  |> add_cookie
 }
 
 // JAVASCRIPT ------------------------------------------------------------------
@@ -88,9 +119,19 @@ fn serve_game(
   request: Request(Connection),
   topic: glubsub.Topic(game_message.SharedMsg),
 ) -> Response(ResponseData) {
+  let assert Some(user_id) =
+    request.get_cookies(request)
+    |> list.fold(None, fn(acc, c) {
+      case c {
+        #("glurve_user_id", id) -> Some(id)
+        _ -> acc
+      }
+    })
+    as "User ID cookie not found"
+
   mist.websocket(
     request:,
-    on_init: game_socket.init_game_socket(_, topic),
+    on_init: game_socket.init_game_socket(_, user_id, topic),
     handler: game_socket.loop_game_socket,
     on_close: game_socket.close_game_socket,
   )
