@@ -200,6 +200,17 @@ fn serve_game_html(_req: Request, game_id: String) -> Response {
           [server_component.route("/ws/" <> game_id)],
           [],
         ),
+        html.script(
+          [],
+          "
+        const glurve = document.querySelector('lustre-server-component');
+
+        glurve.addEventListener('navigate', (event) => {
+          console.log('navigate', event);
+          window.location.href = event.detail;
+        });
+        ",
+        ),
       ]),
     ])
     |> element.to_document_string_tree

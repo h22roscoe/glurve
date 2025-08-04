@@ -20,6 +20,7 @@ pub type GameMsg {
   Tick
   KeyDown(String)
   KeyUp(String)
+  ReturnToLobby
   NoOp
 }
 
