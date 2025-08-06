@@ -1,42 +1,40 @@
-import game/game.{type GameMsg}
-import game/game_shared_message
-import gleam/dict
+import app/app.{type AppMsg, StartArgs}
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
-import glubsub
+import gleam/otp/actor.{type Started}
+import glubsub.{type Topic}
+import lobby/lobby.{type LobbyMsg}
+import lobby/lobby_manager.{type LobbyManagerMsg}
 import lustre
 import lustre/server_component
 import mist
-import player/player
-import prng/seed.{type Seed}
+import shared_messages.{type AppSharedMsg}
 
-pub type GameSocket {
-  GameSocket(
-    component: lustre.Runtime(GameMsg),
-    self: Subject(server_component.ClientMessage(GameMsg)),
+pub type AppSocket {
+  AppSocket(
+    component: lustre.Runtime(AppMsg),
+    self: Subject(server_component.ClientMessage(AppMsg)),
   )
 }
 
-pub type GameSocketMessage =
-  server_component.ClientMessage(GameMsg)
+pub type AppSocketMessage =
+  server_component.ClientMessage(AppMsg)
 
-pub type GameSocketInit =
-  #(GameSocket, Option(Selector(GameSocketMessage)))
+pub type AppSocketInit =
+  #(AppSocket, Option(Selector(AppSocketMessage)))
 
 pub fn init(
   _,
-  id: String,
-  topic: glubsub.Topic(game_shared_message.GameSharedMsg),
-  players: dict.Dict(String, player.Player),
-  seed: Seed,
-) -> GameSocketInit {
-  let game = game.component()
-
+  user_id: String,
+  topic: Topic(AppSharedMsg(LobbyMsg)),
+  lobby_manager: Started(Subject(LobbyManagerMsg)),
+) -> AppSocketInit {
+  let app = app.component()
   let assert Ok(component) =
     lustre.start_server_component(
-      game,
-      game.StartArgs(id:, topic:, players:, seed:),
+      app,
+      StartArgs(user_id: user_id, topic:, lobby_manager:),
     )
 
   let self = process.new_subject()
@@ -45,14 +43,14 @@ pub fn init(
   server_component.register_subject(self)
   |> lustre.send(to: component)
 
-  #(GameSocket(component:, self:), Some(selector))
+  #(AppSocket(component:, self:), Some(selector))
 }
 
 pub fn loop_socket(
-  state: GameSocket,
-  message: mist.WebsocketMessage(GameSocketMessage),
+  state: AppSocket,
+  message: mist.WebsocketMessage(AppSocketMessage),
   connection: mist.WebsocketConnection,
-) -> mist.Next(GameSocket, GameSocketMessage) {
+) -> mist.Next(AppSocket, AppSocketMessage) {
   case message {
     mist.Text(json) -> {
       case json.parse(json, server_component.runtime_message_decoder()) {
@@ -83,7 +81,7 @@ pub fn loop_socket(
   }
 }
 
-pub fn close_socket(state: GameSocket) -> Nil {
+pub fn close_socket(state: AppSocket) -> Nil {
   server_component.deregister_subject(state.self)
   |> lustre.send(to: state.component)
 }

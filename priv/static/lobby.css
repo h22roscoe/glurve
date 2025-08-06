@@ -72,11 +72,11 @@ body {
 .btn-secondary:hover { 
   background: #4a5568; 
 }
-.game-list { 
+.lobby-list { 
   max-height: 300px; 
   overflow-y: auto; 
 }
-.game-item { 
+.lobby-item { 
   padding: 12px; 
   border: 1px solid #e2e8f0; 
   border-radius: 4px; 
@@ -86,16 +86,16 @@ body {
   justify-content: space-between; 
   align-items: center; 
 }
-.game-info h3 { 
+.lobby-info h3 { 
   color: #2d3748; 
   font-size: 1em; 
   margin-bottom: 4px; 
 }
-.game-info p { 
+.lobby-info p { 
   color: #718096; 
   font-size: 0.9em; 
 }
-.current-game { 
+.current-lobby { 
   background: #c6f6d5; 
   border-color: #68d391; 
 }
