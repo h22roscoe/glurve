@@ -7,8 +7,6 @@ import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
-import gleam/yielder
 import gleam_community/colour
 import gleam_community/maths
 import glubsub
@@ -22,8 +20,7 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 import player/player.{tail_radius}
-import position
-import uuid_colour
+import prng/seed.{type Seed}
 
 const height = 500
 
@@ -32,7 +29,12 @@ const width = 500
 const tick_delay_ms = 10
 
 pub type StartArgs {
-  StartArgs(id: String, topic: glubsub.Topic(GameSharedMsg))
+  StartArgs(
+    id: String,
+    topic: glubsub.Topic(GameSharedMsg),
+    players: dict.Dict(String, player.Player),
+    seed: Seed,
+  )
 }
 
 pub fn component() -> App(StartArgs, Model, GameMsg) {
@@ -60,6 +62,7 @@ pub type Model {
     players: dict.Dict(String, player.Player),
     timer: Option(time.TimerID),
     countdown_timer: Option(time.TimerID),
+    seed: Seed,
   )
 }
 
@@ -91,38 +94,18 @@ fn subscribe(
 }
 
 fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
-  let this_player =
-    player.Player(
-      id: start_args.id,
-      position: position.random_start_position(height, width)
-        |> yielder.first()
-        |> result.unwrap(position.Position(x: 0.0, y: 0.0)),
-      speed: 0.0,
-      angle: 0.0,
-      colour: uuid_colour.colour_for_uuid(start_args.id),
-      tail: [],
-      turning: player.Straight,
-    )
   let model =
     Model(
       topic: start_args.topic,
       game_state: NotStarted,
       player_id: start_args.id,
-      players: dict.from_list([#(start_args.id, this_player)]),
+      players: start_args.players,
       timer: None,
       countdown_timer: None,
+      seed: start_args.seed,
     )
 
-  #(
-    model,
-    effect.batch([
-      subscribe(start_args.topic, RecievedSharedMsg),
-      broadcast(
-        start_args.topic,
-        game_shared_message.PlayerJoined(start_args.id),
-      ),
-    ]),
-  )
+  #(model, subscribe(start_args.topic, RecievedSharedMsg))
 }
 
 fn tick_effect() -> Effect(GameMsg) {
@@ -174,49 +157,6 @@ fn handle_shared_msg(
   shared_msg: GameSharedMsg,
 ) -> #(Model, Effect(GameMsg)) {
   case shared_msg {
-    game_shared_message.PlayerJoined(player_id) -> #(
-      Model(
-        ..model,
-        players: dict.insert(
-          model.players,
-          player_id,
-          player.Player(
-            id: player_id,
-            colour: uuid_colour.colour_for_uuid(player_id),
-            position: position.Position(x: 0.0, y: 0.0),
-            speed: 0.0,
-            angle: 0.0,
-            tail: [],
-            turning: player.Straight,
-          ),
-        ),
-      ),
-      broadcast(
-        model.topic,
-        game_shared_message.ExistingPlayer(model.player_id),
-      ),
-    )
-
-    game_shared_message.ExistingPlayer(player_id) -> #(
-      Model(
-        ..model,
-        players: dict.insert(
-          model.players,
-          player_id,
-          player.Player(
-            id: player_id,
-            colour: uuid_colour.colour_for_uuid(player_id),
-            position: position.Position(x: 0.0, y: 0.0),
-            speed: 0.0,
-            angle: 0.0,
-            tail: [],
-            turning: player.Straight,
-          ),
-        ),
-      ),
-      effect.none(),
-    )
-
     game_shared_message.PlayerCrashed(player_id) -> {
       let assert Ok(that_player) = dict.get(model.players, player_id)
       let that_player_crashed = player.Player(..that_player, speed: 0.0)
@@ -240,22 +180,9 @@ fn handle_shared_msg(
     }
 
     game_shared_message.StartedGame -> {
-      let num_players = dict.size(model.players)
-      let positions =
-        yielder.take(position.random_start_position(height, width), num_players)
-        |> yielder.to_list()
-      let players =
-        dict.to_list(model.players)
-        |> list.zip(positions)
-        |> list.map(fn(zipped) {
-          let #(#(id, player), pos) = zipped
-          #(id, player.Player(..player, position: pos))
-        })
-        |> dict.from_list()
       #(
         Model(
           ..model,
-          players: players,
           game_state: Countdown(3),
           // Will be set by the NewTimer message
           timer: None,

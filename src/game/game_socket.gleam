@@ -1,5 +1,6 @@
 import game/game.{type GameMsg}
 import game/game_shared_message
+import gleam/dict
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
@@ -7,6 +8,8 @@ import glubsub
 import lustre
 import lustre/server_component
 import mist
+import player/player
+import prng/seed.{type Seed}
 
 pub type GameSocket {
   GameSocket(
@@ -25,11 +28,16 @@ pub fn init(
   _,
   id: String,
   topic: glubsub.Topic(game_shared_message.GameSharedMsg),
+  players: dict.Dict(String, player.Player),
+  seed: Seed,
 ) -> GameSocketInit {
   let game = game.component()
 
   let assert Ok(component) =
-    lustre.start_server_component(game, game.StartArgs(id:, topic:))
+    lustre.start_server_component(
+      game,
+      game.StartArgs(id:, topic:, players:, seed:),
+    )
 
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)
