@@ -41,7 +41,8 @@ pub fn main() {
   ) {
     case request.path_segments(req) {
       ["ws"] -> serve_app_ws(req, topic, lobby_manager)
-      ["ws", lobby_id] -> serve_game_ws(req, lobby_id, lobby_manager, seed)
+      ["ws", lobby_id] ->
+        serve_game_ws(req, topic, lobby_id, lobby_manager, seed)
       _ -> wisp_handler(req)
     }
   }
@@ -83,6 +84,7 @@ fn serve_app_ws(
 
 fn serve_game_ws(
   req: request.Request(mist.Connection),
+  app_topic: Topic(AppSharedMsg(LobbyMsg)),
   lobby_id: String,
   lobby_manager: Started(Subject(LobbyManagerMsg)),
   seed: Seed,
@@ -123,7 +125,15 @@ fn serve_game_ws(
 
   mist.websocket(
     request: req,
-    on_init: game_socket.init(_, user_id, game_topic, players, next_seed),
+    on_init: game_socket.init(
+      _,
+      user_id,
+      lobby_id,
+      app_topic,
+      game_topic,
+      players,
+      next_seed,
+    ),
     handler: game_socket.loop_socket,
     on_close: game_socket.close_socket,
   )
