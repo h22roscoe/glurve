@@ -1,11 +1,13 @@
+import app/app_shared_message.{type AppSharedMsg}
 import app/app_socket
-import gleam/erlang/process
+import gleam/erlang/process.{type Subject}
 import gleam/http/request
 import gleam/http/response
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
-import lobby/lobby_manager
+import lobby/lobby_manager.{type LobbyManagerMsg}
 import mist
 import router
 import wisp
@@ -16,7 +18,8 @@ import wisp/wisp_mist
 pub fn main() {
   wisp.configure_logger()
 
-  let lobby_manager = lobby_manager.start()
+  let assert Ok(topic) = glubsub.new_topic()
+  let lobby_manager = lobby_manager.start(topic)
 
   let secret_key_base = "glurve"
 
@@ -28,7 +31,7 @@ pub fn main() {
     mist.ResponseData,
   ) {
     case request.path_segments(req) {
-      ["ws"] -> serve_app(req, lobby_manager)
+      ["ws"] -> serve_app(req, topic, lobby_manager)
       _ -> wisp_handler(req)
     }
   }
@@ -48,6 +51,7 @@ pub fn main() {
 fn serve_app(
   req: request.Request(mist.Connection),
   topic: Topic(AppSharedMsg),
+  lobby_manager: Started(Subject(LobbyManagerMsg)),
 ) -> response.Response(mist.ResponseData) {
   let assert Some(user_id) =
     request.get_cookies(req)
@@ -61,7 +65,7 @@ fn serve_app(
 
   mist.websocket(
     request: req,
-    on_init: app_socket.init_socket(_, user_id, lobby_manager),
+    on_init: app_socket.init(_, user_id, topic, lobby_manager),
     handler: app_socket.loop_socket,
     on_close: app_socket.close_socket,
   )

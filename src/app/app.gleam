@@ -1,3 +1,4 @@
+import app/app_shared_message.{type AppSharedMsg}
 import game/game
 import game/game_message
 import gleam/dict
@@ -6,19 +7,17 @@ import gleam/option.{type Option}
 import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
 import lobby/lobby
-import lobby/lobby_manager
+import lobby/lobby_manager.{type LobbyManagerMsg}
 import lustre.{type App}
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 
 pub type StartArgs {
-  StartArgs(topic: Topic(AppSharedMsg))
-}
-
-pub type AppSharedMsg {
-  RecievedLobbyManagerMsg(lobby_manager.LobbyManagerSharedMsg)
-  RecievedLobbyMsg(lobby.LobbySharedMsg)
-  RecievedGameMsg(game_message.GameSharedMsg)
+  StartArgs(
+    user_id: String,
+    topic: Topic(AppSharedMsg),
+    lobby_manager: Started(Subject(LobbyManagerMsg)),
+  )
 }
 
 pub opaque type AppMsg {

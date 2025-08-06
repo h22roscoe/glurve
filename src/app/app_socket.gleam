@@ -1,8 +1,11 @@
-import app/app.{type AppMsg, type AppSharedMsg, StartArgs}
+import app/app.{type AppMsg, StartArgs}
+import app/app_shared_message.{type AppSharedMsg}
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
+import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
+import lobby/lobby_manager.{type LobbyManagerMsg}
 import lustre
 import lustre/server_component
 import mist
@@ -20,10 +23,18 @@ pub type AppSocketMessage =
 pub type AppSocketInit =
   #(AppSocket, Option(Selector(AppSocketMessage)))
 
-pub fn init(_, topic: Topic(AppSharedMsg)) -> AppSocketInit {
+pub fn init(
+  _,
+  user_id: String,
+  topic: Topic(AppSharedMsg),
+  lobby_manager: Started(Subject(LobbyManagerMsg)),
+) -> AppSocketInit {
   let app = app.component()
   let assert Ok(component) =
-    lustre.start_server_component(app, StartArgs(topic:))
+    lustre.start_server_component(
+      app,
+      StartArgs(user_id: user_id, topic:, lobby_manager:),
+    )
 
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)

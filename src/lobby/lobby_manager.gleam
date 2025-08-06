@@ -1,11 +1,14 @@
+import app/app_shared_message.{type AppSharedMsg, RecievedLobbyManagerMsg}
 import gleam/dict
 import gleam/erlang/process
 import gleam/otp/actor
-import glubsub
+import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
+import lobby/lobby_manager_shared_message.{LobbyCreated, LobbyRemoved}
 
-pub fn start() -> actor.Started(process.Subject(LobbyManagerMsg)) {
-  let assert Ok(topic) = glubsub.new_topic()
+pub fn start(
+  topic: Topic(AppSharedMsg),
+) -> actor.Started(process.Subject(LobbyManagerMsg)) {
   let state = LobbyManagerState(lobbies: dict.new(), topic: topic)
   let assert Ok(actor) =
     actor.new(state)
@@ -17,13 +20,8 @@ pub fn start() -> actor.Started(process.Subject(LobbyManagerMsg)) {
 pub opaque type LobbyManagerState {
   LobbyManagerState(
     lobbies: dict.Dict(String, actor.Started(process.Subject(LobbyMsg))),
-    topic: glubsub.Topic(LobbyManagerSharedMsg),
+    topic: glubsub.Topic(AppSharedMsg),
   )
-}
-
-pub opaque type LobbyManagerSharedMsg {
-  LobbyCreated(name: String, lobby: actor.Started(process.Subject(LobbyMsg)))
-  LobbyRemoved(name: String)
 }
 
 pub type LobbyManagerMsg {
@@ -44,7 +42,10 @@ fn handle_lobby_manager_msg(
     CreateLobby(name, max_players) -> {
       let lobby = lobby.start(name, max_players)
       let assert Ok(_) =
-        glubsub.broadcast(state.topic, LobbyCreated(name, lobby))
+        glubsub.broadcast(
+          state.topic,
+          LobbyCreated(name, lobby) |> RecievedLobbyManagerMsg,
+        )
       actor.continue(
         LobbyManagerState(
           ..state,
@@ -54,7 +55,11 @@ fn handle_lobby_manager_msg(
     }
     RemoveLobby(name) -> {
       let new_lobbies = dict.delete(state.lobbies, name)
-      let assert Ok(_) = glubsub.broadcast(state.topic, LobbyRemoved(name))
+      let assert Ok(_) =
+        glubsub.broadcast(
+          state.topic,
+          LobbyRemoved(name) |> RecievedLobbyManagerMsg,
+        )
       actor.continue(LobbyManagerState(..state, lobbies: new_lobbies))
     }
     ListLobbies(reply_with) -> {

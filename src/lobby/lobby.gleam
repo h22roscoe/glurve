@@ -3,6 +3,10 @@ import gleam/erlang/process
 import gleam/otp/actor
 import gleam/set.{type Set}
 import glubsub
+import lobby/lobby_shared_message.{
+  type LobbySharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
+  PlayerBecameNotReady, PlayerBecameReady,
+}
 
 pub fn start(
   name: String,
@@ -43,15 +47,6 @@ pub opaque type LobbyStatus {
   Waiting
   Full
   Playing
-}
-
-pub opaque type LobbySharedMsg {
-  LobbyJoined(player_id: String)
-  LobbyLeft(player_id: String)
-  PlayerBecameReady(player_id: String)
-  PlayerBecameNotReady(player_id: String)
-  AllPlayersReady
-  LobbyClosed
 }
 
 pub opaque type LobbyMsg {
