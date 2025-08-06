@@ -1,5 +1,5 @@
-import game/countdown
-import game/game_message.{type GameMsg}
+import game/game_shared_message.{type GameSharedMsg}
+import game/time
 import gleam/dict
 import gleam/erlang/process
 import gleam/float
@@ -9,6 +9,8 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/yielder
+import gleam_community/colour
+import gleam_community/maths
 import glubsub
 import lustre.{type App}
 import lustre/attribute
@@ -19,8 +21,7 @@ import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
-import player/draw
-import player/player
+import player/player.{tail_radius}
 import position
 import uuid_colour
 
@@ -31,21 +32,34 @@ const width = 500
 const tick_delay_ms = 10
 
 pub type StartArgs {
-  StartArgs(id: String, topic: glubsub.Topic(game_message.GameSharedMsg))
+  StartArgs(id: String, topic: glubsub.Topic(GameSharedMsg))
 }
 
 pub fn component() -> App(StartArgs, Model, GameMsg) {
   lustre.application(init, update, view)
 }
 
+pub type GameMsg {
+  RecievedSharedMsg(GameSharedMsg)
+  KickOffGame
+  NewTimer(time.TimerID)
+  NewCountdownTimer(time.TimerID)
+  CountdownTick
+  Tick
+  KeyDown(String)
+  KeyUp(String)
+  ReturnToLobby
+  NoOp
+}
+
 pub type Model {
   Model(
-    topic: glubsub.Topic(game_message.GameSharedMsg),
+    topic: glubsub.Topic(GameSharedMsg),
     game_state: GameState,
     player_id: String,
     players: dict.Dict(String, player.Player),
-    timer: Option(game_message.TimerID),
-    countdown_timer: Option(game_message.TimerID),
+    timer: Option(time.TimerID),
+    countdown_timer: Option(time.TimerID),
   )
 }
 
@@ -102,45 +116,38 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
   #(
     model,
     effect.batch([
-      subscribe(start_args.topic, game_message.RecievedSharedMsg),
-      broadcast(start_args.topic, game_message.PlayerJoined(start_args.id)),
+      subscribe(start_args.topic, RecievedSharedMsg),
+      broadcast(
+        start_args.topic,
+        game_shared_message.PlayerJoined(start_args.id),
+      ),
     ]),
   )
 }
 
 fn tick_effect() -> Effect(GameMsg) {
-  effect.from(fn(dispatch) {
-    case
-      game_message.apply_interval(tick_delay_ms, fn() {
-        dispatch(game_message.Tick)
-      })
-    {
-      Ok(timer) -> dispatch(game_message.NewTimer(timer))
-      Error(_) -> Nil
-    }
-  })
+  use dispatch <- effect.from
+  case time.apply_interval(tick_delay_ms, fn() { dispatch(Tick) }) {
+    Ok(timer) -> dispatch(NewTimer(timer))
+    Error(_) -> Nil
+  }
 }
 
 fn countdown_effect() -> Effect(GameMsg) {
-  effect.from(fn(dispatch) {
-    case
-      game_message.apply_interval(1000, fn() {
-        dispatch(game_message.CountdownTick)
-      })
-    {
-      Ok(timer) -> dispatch(game_message.NewCountdownTimer(timer))
-      Error(_) -> Nil
-    }
-  })
+  use dispatch <- effect.from
+  case time.apply_interval(1000, fn() { dispatch(CountdownTick) }) {
+    Ok(timer) -> dispatch(NewCountdownTimer(timer))
+    Error(_) -> Nil
+  }
 }
 
-fn cancel_timer(timer: Option(game_message.TimerID)) -> Effect(GameMsg) {
+fn cancel_timer(timer: Option(time.TimerID)) -> Effect(GameMsg) {
   case timer {
-    Some(timer) ->
-      effect.from(fn(dispatch) {
-        let _ = game_message.cancel(timer)
-        dispatch(game_message.NoOp)
-      })
+    Some(timer) -> {
+      use dispatch <- effect.from
+      let _ = time.cancel(timer)
+      dispatch(NoOp)
+    }
     None -> effect.none()
   }
 }
@@ -164,10 +171,10 @@ fn handle_turn(
 
 fn handle_shared_msg(
   model: Model,
-  shared_msg: game_message.GameSharedMsg,
+  shared_msg: GameSharedMsg,
 ) -> #(Model, Effect(GameMsg)) {
   case shared_msg {
-    game_message.PlayerJoined(player_id) -> #(
+    game_shared_message.PlayerJoined(player_id) -> #(
       Model(
         ..model,
         players: dict.insert(
@@ -184,10 +191,13 @@ fn handle_shared_msg(
           ),
         ),
       ),
-      broadcast(model.topic, game_message.ExistingPlayer(model.player_id)),
+      broadcast(
+        model.topic,
+        game_shared_message.ExistingPlayer(model.player_id),
+      ),
     )
 
-    game_message.ExistingPlayer(player_id) -> #(
+    game_shared_message.ExistingPlayer(player_id) -> #(
       Model(
         ..model,
         players: dict.insert(
@@ -207,7 +217,7 @@ fn handle_shared_msg(
       effect.none(),
     )
 
-    game_message.PlayerCrashed(player_id) -> {
+    game_shared_message.PlayerCrashed(player_id) -> {
       let assert Ok(that_player) = dict.get(model.players, player_id)
       let that_player_crashed = player.Player(..that_player, speed: 0.0)
       let new_players =
@@ -229,7 +239,7 @@ fn handle_shared_msg(
       }
     }
 
-    game_message.StartedGame -> {
+    game_shared_message.StartedGame -> {
       let num_players = dict.size(model.players)
       let positions =
         yielder.take(position.random_start_position(height, width), num_players)
@@ -255,7 +265,7 @@ fn handle_shared_msg(
       )
     }
 
-    game_message.PlayerTurning(player_id, direction) -> {
+    game_shared_message.PlayerTurning(player_id, direction) -> {
       case player_id == model.player_id {
         True -> #(model, effect.none())
         False -> #(
@@ -272,17 +282,14 @@ fn handle_shared_msg(
 
 fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
   case msg {
-    game_message.NewTimer(timer) -> #(
-      Model(..model, timer: Some(timer)),
-      effect.none(),
-    )
+    NewTimer(timer) -> #(Model(..model, timer: Some(timer)), effect.none())
 
-    game_message.NewCountdownTimer(timer) -> #(
+    NewCountdownTimer(timer) -> #(
       Model(..model, countdown_timer: Some(timer)),
       effect.none(),
     )
 
-    game_message.CountdownTick -> {
+    CountdownTick -> {
       let players_with_speed =
         dict.map_values(model.players, fn(_, p) {
           p |> player.update_speed(1.0)
@@ -304,15 +311,14 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       }
     }
 
-    game_message.KickOffGame -> #(
+    KickOffGame -> #(
       model,
-      broadcast(model.topic, game_message.StartedGame),
+      broadcast(model.topic, game_shared_message.StartedGame),
     )
 
-    game_message.RecievedSharedMsg(shared_msg) ->
-      handle_shared_msg(model, shared_msg)
+    RecievedSharedMsg(shared_msg) -> handle_shared_msg(model, shared_msg)
 
-    game_message.Tick -> {
+    Tick -> {
       let new_players =
         dict.map_values(model.players, fn(_, p) {
           player.update(p, height, width)
@@ -340,14 +346,17 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
         False -> #(Model(..model, players: new_players), effect.none())
         _ -> #(
           Model(..model, players: new_players_with_crashed, game_state: Crashed),
-          broadcast(model.topic, game_message.PlayerCrashed(model.player_id)),
+          broadcast(
+            model.topic,
+            game_shared_message.PlayerCrashed(model.player_id),
+          ),
         )
       }
     }
 
-    game_message.KeyDown("ArrowRight") -> {
+    KeyDown("ArrowRight") -> {
       let broadcast_msg =
-        game_message.PlayerTurning(model.player_id, player.Right)
+        game_shared_message.PlayerTurning(model.player_id, player.Right)
       let broadcast_effect = broadcast(model.topic, broadcast_msg)
 
       #(
@@ -359,9 +368,9 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       )
     }
 
-    game_message.KeyDown("ArrowLeft") -> {
+    KeyDown("ArrowLeft") -> {
       let broadcast_msg =
-        game_message.PlayerTurning(model.player_id, player.Left)
+        game_shared_message.PlayerTurning(model.player_id, player.Left)
       let broadcast_effect = broadcast(model.topic, broadcast_msg)
       #(
         Model(
@@ -372,11 +381,11 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       )
     }
 
-    game_message.KeyDown(_) -> #(model, effect.none())
+    KeyDown(_) -> #(model, effect.none())
 
-    game_message.KeyUp("ArrowLeft") | game_message.KeyUp("ArrowRight") -> {
+    KeyUp("ArrowLeft") | KeyUp("ArrowRight") -> {
       let broadcast_msg =
-        game_message.PlayerTurning(model.player_id, player.Straight)
+        game_shared_message.PlayerTurning(model.player_id, player.Straight)
       let broadcast_effect = broadcast(model.topic, broadcast_msg)
       #(
         Model(
@@ -387,14 +396,14 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       )
     }
 
-    game_message.KeyUp(_) -> #(model, effect.none())
+    KeyUp(_) -> #(model, effect.none())
 
-    game_message.ReturnToLobby -> #(
+    ReturnToLobby -> #(
       model,
       server_component.emit("navigate", json.string("/")),
     )
 
-    game_message.NoOp -> #(model, effect.none())
+    NoOp -> #(model, effect.none())
   }
 }
 
@@ -402,23 +411,22 @@ fn view(model: Model) -> Element(GameMsg) {
   let on_key_down =
     event.on_keydown(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> game_message.KeyDown("ArrowLeft")
-        "ArrowRight" | "D" | "d" -> game_message.KeyDown("ArrowRight")
-        _ -> game_message.NoOp
+        "ArrowLeft" | "A" | "a" -> KeyDown("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> KeyDown("ArrowRight")
+        _ -> NoOp
       }
     })
 
   let on_key_up =
     event.on_keyup(fn(key) {
       case key {
-        "ArrowLeft" | "A" | "a" -> game_message.KeyUp("ArrowLeft")
-        "ArrowRight" | "D" | "d" -> game_message.KeyUp("ArrowRight")
-        _ -> game_message.NoOp
+        "ArrowLeft" | "A" | "a" -> KeyUp("ArrowLeft")
+        "ArrowRight" | "D" | "d" -> KeyUp("ArrowRight")
+        _ -> NoOp
       }
     })
 
-  let player_elements =
-    list.flat_map(dict.values(model.players), draw.draw_player)
+  let player_elements = list.flat_map(dict.values(model.players), draw_player)
   let num_players = dict.size(model.players)
   let players_list =
     dict.values(model.players)
@@ -438,7 +446,7 @@ fn view(model: Model) -> Element(GameMsg) {
         attribute.attribute("font-family", "sans-serif"),
         attribute.attribute("fill", "black"),
         attribute.style("cursor", "pointer"),
-        event.on_click(game_message.KickOffGame),
+        event.on_click(KickOffGame),
       ],
       "Click to Start",
     )
@@ -481,7 +489,7 @@ fn view(model: Model) -> Element(GameMsg) {
         attribute.attribute("font-size", "14"),
         attribute.attribute("font-family", "sans-serif"),
         attribute.attribute("fill", "gray"),
-        event.on_click(game_message.ReturnToLobby),
+        event.on_click(ReturnToLobby),
       ],
       "Click anywhere to return to lobby",
     )
@@ -491,7 +499,7 @@ fn view(model: Model) -> Element(GameMsg) {
       [#("start", start_text_element), ..players_list]
     }
     Countdown(count) -> {
-      countdown.draw(count)
+      draw_countdown(count)
     }
     Ended -> {
       let winner =
@@ -536,7 +544,7 @@ fn view(model: Model) -> Element(GameMsg) {
       attribute.style("cursor", "pointer"),
       server_component.include(on_key_down, ["key"]),
       server_component.include(on_key_up, ["key"]),
-      event.on_click(game_message.ReturnToLobby),
+      event.on_click(ReturnToLobby),
     ]
     _ -> [
       attribute.attribute("width", int.to_string(width)),
@@ -587,4 +595,100 @@ fn overlay_text_with_index(
       text,
     )
   #(text <> int.to_string(idx), text_element)
+}
+
+const head_size = 10.0
+
+/// Draws the player by creating a list of SVG elements that represent
+/// the player's head and tail. The first element of each tuple is a string
+/// that is used as the key of the element in the list, so that we only rerender
+/// new keyed elements.
+pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
+  let colour = player.colour
+  let tail_points =
+    player.tail
+    |> list.map(fn(pos) {
+      let #(x, y) = pos
+      svg.circle([
+        attribute.attribute("cx", float.to_string(x)),
+        attribute.attribute("cy", float.to_string(y)),
+        attribute.attribute("r", float.to_string(tail_radius)),
+        attribute.attribute("fill", colour.to_css_rgba_string(colour)),
+        attribute.attribute("stroke", "black"),
+        attribute.attribute("stroke-width", "0.02"),
+      ])
+    })
+
+  // Draw a triangle "head" at (player.x, player.y) facing player.angle
+  let angle = player.angle
+
+  // Calculate the three points of the triangle
+  let tip_x = player.position.x +. maths.cos(angle) *. head_size
+  let tip_y = player.position.y +. maths.sin(angle) *. head_size
+
+  let left_angle = angle +. maths.pi() *. 2.0 /. 3.0
+  let left_x =
+    player.position.x +. maths.cos(left_angle) *. { head_size /. 1.5 }
+  let left_y =
+    player.position.y +. maths.sin(left_angle) *. { head_size /. 1.5 }
+
+  let right_angle = angle -. maths.pi() *. 2.0 /. 3.0
+  let right_x =
+    player.position.x +. maths.cos(right_angle) *. { head_size /. 1.5 }
+  let right_y =
+    player.position.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
+
+  let points =
+    float.to_string(tip_x)
+    <> ","
+    <> float.to_string(tip_y)
+    <> " "
+    <> float.to_string(left_x)
+    <> ","
+    <> float.to_string(left_y)
+    <> " "
+    <> float.to_string(right_x)
+    <> ","
+    <> float.to_string(right_y)
+
+  let head =
+    svg.polygon([
+      attribute.attribute("points", points),
+      attribute.attribute("fill", colour.to_css_rgba_string(colour)),
+      attribute.attribute("stroke", "black"),
+      attribute.attribute("stroke-width", "0.1"),
+    ])
+
+  let head_keyed = #("head", head)
+
+  let tail_points_len = list.length(tail_points)
+  let tail_points_keyed =
+    tail_points
+    |> list.index_map(fn(pos, index) {
+      #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
+    })
+
+  [head_keyed, ..tail_points_keyed]
+}
+
+pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {
+  let countdown_colour = case colour.from_hsla(1.0, 1.0, 0.0, 0.15) {
+    Ok(c) -> c
+    Error(_) -> colour.black
+  }
+
+  let countdown_text =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "50%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "200"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", colour.to_css_rgba_string(countdown_colour)),
+      ],
+      int.to_string(count),
+    )
+  [#("countdown", countdown_text)]
 }
