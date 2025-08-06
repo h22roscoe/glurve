@@ -13,11 +13,11 @@ gleam test  # Run the tests
 ```
 
 ## Features needed
-- [] Join lobby when you create it
-- [] Add ability for game to communicate back to app when done, which closes the lobby and transitions players to lobby screen
-- [] Add style to game screen
-- [] Ability to unready yourself in a lobby
-- [] Add resizing game screen capability (based on num players mostly)
-- [] (Longer term) Multiple rounds in a game
-- [] (Longer term) Points per round and scoreboard display
-- [] (Longer term) Join as spectator
+- [ ] Join lobby when you create it
+- [ ] Add ability for game to communicate back to app when done, which closes the lobby and transitions players to lobby screen
+- [ ] Add style to game screen
+- [ ] Ability to unready yourself in a lobby
+- [ ] Add resizing game screen capability (based on num players mostly)
+- [ ] (Longer term) Multiple rounds in a game
+- [ ] (Longer term) Points per round and scoreboard display
+- [ ] (Longer term) Join as spectator
