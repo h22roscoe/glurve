@@ -190,8 +190,14 @@ fn update_lobby_shared_msg(
           #(AppModel(..model, state: InGame), effect.none())
         }
         LobbyClosed -> {
+          let lobbies = dict.delete(model.lobbies, lobby_info.name)
           #(
-            AppModel(..model, state: InLobby, current_lobby: None),
+            AppModel(
+              ..model,
+              state: InLobby,
+              current_lobby: None,
+              lobbies: lobbies,
+            ),
             effect.none(),
           )
         }

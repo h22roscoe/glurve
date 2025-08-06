@@ -9,6 +9,7 @@ import gleam/option.{type Option, None, Some}
 import gleam_community/colour
 import gleam_community/maths
 import glubsub
+import lobby/lobby.{type LobbyMsg}
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -20,6 +21,10 @@ import lustre/event
 import lustre/server_component
 import player/player.{tail_radius}
 import prng/seed.{type Seed}
+import shared_messages.{
+  type AppSharedMsg, LobbyClosed, LobbyManagerSharedMsg, LobbyRemoved,
+  LobbySharedMsg,
+}
 
 const height = 500
 
@@ -31,7 +36,9 @@ const tick_delay_ms = 10
 
 pub type StartArgs {
   StartArgs(
-    id: String,
+    lobby_id: String,
+    app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
+    user_id: String,
     topic: glubsub.Topic(GameSharedMsg),
     players: dict.Dict(String, player.Player),
     seed: Seed,
@@ -50,11 +57,14 @@ pub type GameMsg {
   Tick
   KeyDown(String)
   KeyUp(String)
+  EndGame
   NoOp
 }
 
 pub type Model {
   Model(
+    lobby_id: String,
+    app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
     topic: glubsub.Topic(GameSharedMsg),
     game_state: GameState,
     player_id: String,
@@ -94,9 +104,11 @@ fn subscribe(
 fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
   let model =
     Model(
+      lobby_id: start_args.lobby_id,
+      app_topic: start_args.app_topic,
       topic: start_args.topic,
       game_state: Countdown(3),
-      player_id: start_args.id,
+      player_id: start_args.user_id,
       players: start_args.players,
       timer: None,
       countdown_timer: None,
@@ -127,6 +139,17 @@ fn countdown_effect() -> Effect(GameMsg) {
     Ok(timer) -> dispatch(NewCountdownTimer(timer))
     Error(_) -> Nil
   }
+}
+
+fn end_game_effect(
+  app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
+  lobby_id: String,
+) -> Effect(GameMsg) {
+  use _dispatch <- effect.from
+  let assert Ok(_) = glubsub.broadcast(app_topic, LobbySharedMsg(LobbyClosed))
+  let assert Ok(_) =
+    glubsub.broadcast(app_topic, LobbyManagerSharedMsg(LobbyRemoved(lobby_id)))
+  Nil
 }
 
 fn cancel_timer(timer: Option(time.TimerID)) -> Effect(GameMsg) {
@@ -312,6 +335,10 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
 
     KeyUp(_) -> #(model, effect.none())
 
+    EndGame -> {
+      #(model, end_game_effect(model.app_topic, model.lobby_id))
+    }
+
     NoOp -> #(model, effect.none())
   }
 }
@@ -365,6 +392,21 @@ fn view(model: Model) -> Element(GameMsg) {
       "You Win!",
     )
 
+  let click_to_return_text_element =
+    svg.text(
+      [
+        attribute.attribute("x", "50%"),
+        attribute.attribute("y", "60%"),
+        attribute.attribute("text-anchor", "middle"),
+        attribute.attribute("dominant-baseline", "middle"),
+        attribute.attribute("font-size", "14"),
+        attribute.attribute("font-family", "sans-serif"),
+        attribute.attribute("fill", "gray"),
+        event.on_click(EndGame),
+      ],
+      "Click anywhere to return to lobby",
+    )
+
   let overlay_elements = case model.game_state {
     Countdown(count) -> {
       draw_countdown(count)
@@ -378,11 +420,20 @@ fn view(model: Model) -> Element(GameMsg) {
       case winner {
         Ok(winner) -> {
           case winner.id == model.player_id {
-            True -> [#("winner", winner_text_element)]
-            False -> [#("game_over", game_over_text_element)]
+            True -> [
+              #("winner", winner_text_element),
+              #("click_to_return", click_to_return_text_element),
+            ]
+            False -> [
+              #("game_over", game_over_text_element),
+              #("click_to_return", click_to_return_text_element),
+            ]
           }
         }
-        Error(_) -> [#("game_over", game_over_text_element)]
+        Error(_) -> [
+          #("game_over", game_over_text_element),
+          #("click_to_return", click_to_return_text_element),
+        ]
       }
     }
     _ -> []
