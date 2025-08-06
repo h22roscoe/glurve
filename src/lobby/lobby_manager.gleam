@@ -1,4 +1,4 @@
-import app/app_shared_message.{type AppSharedMsg, RecievedLobbyManagerMsg}
+import app/app_shared_message.{type AppSharedMsg, LobbyManagerSharedMsg}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor.{type Started}
@@ -44,7 +44,7 @@ fn handle_lobby_manager_msg(
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
-          LobbyCreated(name, lobby) |> RecievedLobbyManagerMsg,
+          LobbyCreated(name, lobby) |> LobbyManagerSharedMsg,
         )
       actor.continue(
         LobbyManagerState(
@@ -58,7 +58,7 @@ fn handle_lobby_manager_msg(
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
-          LobbyRemoved(name) |> RecievedLobbyManagerMsg,
+          LobbyRemoved(name) |> LobbyManagerSharedMsg,
         )
       actor.continue(LobbyManagerState(..state, lobbies: new_lobbies))
     }

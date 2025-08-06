@@ -24,9 +24,9 @@ pub type StartArgs {
 }
 
 pub opaque type AppMsg {
+  RecievedAppSharedMsg(AppSharedMsg)
   LobbyManagerMsg(LobbyManagerMsg)
   LobbyMsg(LobbyMsg)
-  GameMsg(GameMsg)
 }
 
 pub type AppState {
@@ -37,6 +37,7 @@ pub type AppState {
 pub type AppModel {
   AppModel(
     state: AppState,
+    player_id: String,
     lobbies: dict.Dict(String, Started(Subject(lobby.LobbyMsg))),
     current_lobby: Option(String),
   )
@@ -46,22 +47,72 @@ pub fn component() -> App(StartArgs, AppModel, AppMsg) {
   lustre.application(init, update, view)
 }
 
+fn subscribe(
+  topic: glubsub.Topic(topic),
+  on_msg handle_msg: fn(topic) -> msg,
+) -> Effect(msg) {
+  use _dispatch, subject <- server_component.select
+
+  let assert Ok(_) = glubsub.subscribe(topic, subject)
+
+  let selector =
+    process.new_selector()
+    |> process.select_map(subject, handle_msg)
+
+  selector
+}
+
 fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
-  todo
+  let model =
+    AppModel(
+      state: InLobby,
+      player_id: args.user_id,
+      lobbies: dict.new(),
+      current_lobby: None,
+    )
+  #(model, subscribe(args.topic, RecievedAppSharedMsg))
 }
 
 fn update(model: AppModel, msg: AppMsg) -> #(AppModel, Effect(AppMsg)) {
+  case msg {
+    RecievedAppSharedMsg(r) -> update_shared_msg(model, r)
+    LobbyManagerMsg(l) -> update_lobby_manager_msg(model, l)
+    LobbyMsg(l) -> update_lobby_msg(model, l)
+  }
+}
+
+fn update_shared_msg(
+  model: AppModel,
+  msg: AppSharedMsg,
+) -> #(AppModel, Effect(AppMsg)) {
+  todo
+}
+
+fn update_lobby_manager_msg(
+  model: AppModel,
+  msg: LobbyManagerMsg,
+) -> #(AppModel, Effect(AppMsg)) {
+  todo
+}
+
+fn update_lobby_msg(
+  model: AppModel,
+  msg: LobbyMsg,
+) -> #(AppModel, Effect(AppMsg)) {
   todo
 }
 
 fn view(model: AppModel) -> Element(AppMsg) {
   case model.state {
-    InLobby -> view_lobby(model.current_lobby)
+    InLobby -> view_lobby(model.current_lobby, model.player_id)
     InGame -> view_game(model.current_lobby)
   }
 }
 
-fn view_lobby(current_lobby: Option(String)) -> Element(AppMsg) {
+fn view_lobby(
+  current_lobby: Option(String),
+  player_id: String,
+) -> Element(AppMsg) {
   html.html([attribute.lang("en")], [
     html.head([], [
       html.meta([attribute.charset("utf-8")]),
