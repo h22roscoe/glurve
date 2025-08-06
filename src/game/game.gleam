@@ -4,7 +4,6 @@ import gleam/dict
 import gleam/erlang/process
 import gleam/float
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam_community/colour
@@ -51,7 +50,6 @@ pub type GameMsg {
   Tick
   KeyDown(String)
   KeyUp(String)
-  ReturnToLobby
   NoOp
 }
 
@@ -314,11 +312,6 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
 
     KeyUp(_) -> #(model, effect.none())
 
-    ReturnToLobby -> #(
-      model,
-      server_component.emit("navigate", json.string("/")),
-    )
-
     NoOp -> #(model, effect.none())
   }
 }
@@ -372,21 +365,6 @@ fn view(model: Model) -> Element(GameMsg) {
       "You Win!",
     )
 
-  let click_to_return_text_element =
-    svg.text(
-      [
-        attribute.attribute("x", "50%"),
-        attribute.attribute("y", "60%"),
-        attribute.attribute("text-anchor", "middle"),
-        attribute.attribute("dominant-baseline", "middle"),
-        attribute.attribute("font-size", "14"),
-        attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "gray"),
-        event.on_click(ReturnToLobby),
-      ],
-      "Click anywhere to return to lobby",
-    )
-
   let overlay_elements = case model.game_state {
     Countdown(count) -> {
       draw_countdown(count)
@@ -400,20 +378,11 @@ fn view(model: Model) -> Element(GameMsg) {
       case winner {
         Ok(winner) -> {
           case winner.id == model.player_id {
-            True -> [
-              #("winner", winner_text_element),
-              #("click_to_return", click_to_return_text_element),
-            ]
-            False -> [
-              #("game_over", game_over_text_element),
-              #("click_to_return", click_to_return_text_element),
-            ]
+            True -> [#("winner", winner_text_element)]
+            False -> [#("game_over", game_over_text_element)]
           }
         }
-        Error(_) -> [
-          #("game_over", game_over_text_element),
-          #("click_to_return", click_to_return_text_element),
-        ]
+        Error(_) -> [#("game_over", game_over_text_element)]
       }
     }
     _ -> []
@@ -425,24 +394,13 @@ fn view(model: Model) -> Element(GameMsg) {
     _ -> player_elements
   }
 
-  let svg_attributes = case model.game_state {
-    Ended -> [
-      attribute.attribute("width", int.to_string(width)),
-      attribute.attribute("height", int.to_string(height)),
-      attribute.tabindex(0),
-      attribute.style("cursor", "pointer"),
-      server_component.include(on_key_down, ["key"]),
-      server_component.include(on_key_up, ["key"]),
-      event.on_click(ReturnToLobby),
-    ]
-    _ -> [
-      attribute.attribute("width", int.to_string(width)),
-      attribute.attribute("height", int.to_string(height)),
-      attribute.tabindex(0),
-      server_component.include(on_key_down, ["key"]),
-      server_component.include(on_key_up, ["key"]),
-    ]
-  }
+  let svg_attributes = [
+    attribute.attribute("width", int.to_string(width)),
+    attribute.attribute("height", int.to_string(height)),
+    attribute.tabindex(0),
+    server_component.include(on_key_down, ["key"]),
+    server_component.include(on_key_up, ["key"]),
+  ]
 
   element.fragment([html.style([], { "
       svg {
