@@ -4,7 +4,8 @@ import gleam/http/request
 import gleam/http/response
 import gleam/list
 import gleam/option.{None, Some}
-import lobby/lobby_manager.{type LobbyManagerMsg}
+import glubsub.{type Topic}
+import lobby/lobby_manager
 import mist
 import router
 import wisp
@@ -46,7 +47,7 @@ pub fn main() {
 
 fn serve_app(
   req: request.Request(mist.Connection),
-  lobby_manager: actor.Started(process.Subject(LobbyManagerMsg)),
+  topic: Topic(AppSharedMsg),
 ) -> response.Response(mist.ResponseData) {
   let assert Some(user_id) =
     request.get_cookies(req)

@@ -1,7 +1,6 @@
 import gleam/erlang/application
 import gleam/http
 import gluid
-import lobby/lobby_manager
 import lustre/attribute
 import lustre/element
 import lustre/element/html.{html}

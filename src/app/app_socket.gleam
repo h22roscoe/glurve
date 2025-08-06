@@ -1,12 +1,8 @@
-import app/app.{type AppMsg}
-import game/game_message.{type GameMsg}
+import app/app.{type AppMsg, type AppSharedMsg, StartArgs}
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
-import gleam/otp/actor
-import glubsub
-import lobby/lobby
-import lobby/lobby_manager
+import glubsub.{type Topic}
 import lustre
 import lustre/server_component
 import mist
@@ -24,13 +20,10 @@ pub type AppSocketMessage =
 pub type AppSocketInit =
   #(AppSocket, Option(Selector(AppSocketMessage)))
 
-pub fn iGameSharedMsgt(
-  _,
-  lobby_manager: actor.Started(process.Subject(lobby_manager.LobbyManagerMsg)),
-) -> AppSocketInit {
+pub fn init(_, topic: Topic(AppSharedMsg)) -> AppSocketInit {
   let app = app.component()
   let assert Ok(component) =
-    lustre.start_server_component(app, app.StartArgs(lobby_manager:))
+    lustre.start_server_component(app, StartArgs(topic:))
 
   let self = process.new_subject()
   let selector = process.new_selector() |> process.select(self)
