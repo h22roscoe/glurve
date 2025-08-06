@@ -1,5 +1,3 @@
-import app/app_shared_message.{type AppSharedMsg}
-import game/game.{type GameMsg}
 import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process.{type Subject}
@@ -10,8 +8,13 @@ import gleam/otp/actor.{type Started}
 import gleam/pair
 import gleam/set
 import glubsub.{type Topic}
-import lobby/lobby.{type LobbyMsg, JoinLobby, LeaveLobby, PlayerReady}
-import lobby/lobby_manager.{type LobbyManagerMsg, CreateLobby}
+import lobby/lobby.{
+  type LobbyInfo, type LobbyMsg, JoinLobby, LeaveLobby, PlayerNotReady,
+  PlayerReady,
+}
+import lobby/lobby_manager.{
+  type LobbyManagerMsg, CreateLobby, ListLobbies, RemoveLobby,
+}
 import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -19,17 +22,23 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 import lustre/server_component
+import shared_messages.{
+  type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
+  AllPlayersReady, LobbyClosed, LobbyCreated, LobbyJoined, LobbyLeft,
+  LobbyManagerSharedMsg, LobbyRemoved, LobbySharedMsg, PlayerBecameNotReady,
+  PlayerBecameReady,
+}
 
 pub type StartArgs {
   StartArgs(
     user_id: String,
-    topic: Topic(AppSharedMsg),
+    topic: Topic(AppSharedMsg(LobbyMsg)),
     lobby_manager: Started(Subject(LobbyManagerMsg)),
   )
 }
 
 pub opaque type AppMsg {
-  RecievedAppSharedMsg(AppSharedMsg)
+  RecievedAppSharedMsg(AppSharedMsg(LobbyMsg))
   LobbyManagerMsg(LobbyManagerMsg)
   LobbyMsg(LobbyMsg)
 }
@@ -44,7 +53,8 @@ pub type AppModel {
     state: AppState,
     player_id: String,
     lobbies: dict.Dict(String, Started(Subject(lobby.LobbyMsg))),
-    current_lobby: Option(String),
+    current_lobby: Option(LobbyInfo),
+    lobby_manager: Started(Subject(LobbyManagerMsg)),
   )
 }
 
@@ -74,6 +84,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       player_id: args.user_id,
       lobbies: dict.new(),
       current_lobby: None,
+      lobby_manager: args.lobby_manager,
     )
   #(model, subscribe(args.topic, RecievedAppSharedMsg))
 }
@@ -88,16 +99,92 @@ fn update(model: AppModel, msg: AppMsg) -> #(AppModel, Effect(AppMsg)) {
 
 fn update_shared_msg(
   model: AppModel,
-  msg: AppSharedMsg,
+  msg: AppSharedMsg(LobbyMsg),
 ) -> #(AppModel, Effect(AppMsg)) {
-  todo
+  case msg {
+    LobbyManagerSharedMsg(l) -> update_lobby_manager_shared_msg(model, l)
+    LobbySharedMsg(l) -> update_lobby_shared_msg(model, l)
+  }
+}
+
+fn update_lobby_manager_shared_msg(
+  model: AppModel,
+  msg: LobbyManagerSharedMsg(LobbyMsg),
+) -> #(AppModel, Effect(AppMsg)) {
+  case msg {
+    LobbyCreated(lobby_id, lobby) -> {
+      let lobbies = dict.insert(model.lobbies, lobby_id, lobby)
+      #(AppModel(..model, lobbies: lobbies), effect.none())
+    }
+    LobbyRemoved(lobby_id) -> {
+      let lobbies = dict.delete(model.lobbies, lobby_id)
+      #(AppModel(..model, lobbies: lobbies), effect.none())
+    }
+  }
+}
+
+fn update_lobby_shared_msg(
+  model: AppModel,
+  msg: LobbySharedMsg,
+) -> #(AppModel, Effect(AppMsg)) {
+  case model.current_lobby {
+    None -> #(model, effect.none())
+    Some(_) -> {
+      case msg {
+        LobbyJoined(_)
+        | LobbyLeft(_)
+        | PlayerBecameReady(_)
+        | PlayerBecameNotReady(_) -> {
+          #(model, effect.none())
+        }
+        AllPlayersReady -> {
+          #(AppModel(..model, state: InGame), effect.none())
+        }
+        LobbyClosed -> {
+          #(
+            AppModel(..model, state: InLobby, current_lobby: None),
+            effect.none(),
+          )
+        }
+      }
+    }
+  }
 }
 
 fn update_lobby_manager_msg(
   model: AppModel,
   msg: LobbyManagerMsg,
 ) -> #(AppModel, Effect(AppMsg)) {
-  todo
+  let lobby_manager = model.lobby_manager
+  case msg {
+    CreateLobby(name, max_players) -> {
+      #(model, create_lobby_effect(lobby_manager, name, max_players))
+    }
+    RemoveLobby(lobby_id) -> {
+      #(model, remove_lobby_effect(lobby_manager, lobby_id))
+    }
+    ListLobbies(_) -> {
+      let lobbies = lobby_manager.list_lobbies(lobby_manager.data)
+      #(AppModel(..model, lobbies: lobbies), effect.none())
+    }
+  }
+}
+
+fn create_lobby_effect(
+  lobby_manager: Started(Subject(LobbyManagerMsg)),
+  name: String,
+  max_players: Int,
+) {
+  use _dispatch <- effect.from
+  lobby_manager.create_lobby(lobby_manager.data, name, max_players)
+}
+
+fn remove_lobby_effect(
+  lobby_manager: Started(Subject(LobbyManagerMsg)),
+  lobby_id: String,
+) {
+  use _dispatch <- effect.from
+  lobby_manager.remove_lobby(lobby_manager.data, lobby_id)
 }
 
 fn update_lobby_msg(
@@ -200,20 +287,20 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
             html.h2([], [html.text("Current Lobby")]),
             html.div([attribute.id("current-lobby-info")], [
               case current_lobby {
-                Some(lobby_id) -> {
-                  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
-                  let lobby_state = lobby.get_lobby_info(lobby.data)
+                Some(lobby_info) -> {
                   html.div([attribute.class("lobby-item current-lobby")], [
                     html.div([attribute.class("lobby-info")], [
-                      html.h3([], [html.text("🎯 Current Lobby: " <> lobby_id)]),
+                      html.h3([], [
+                        html.text("🎯 Current Lobby: " <> lobby_info.name),
+                      ]),
                       html.p([], [
                         html.text(
                           "Ready players: "
-                          <> int.to_string(set.size(lobby_state.ready_players))
+                          <> int.to_string(set.size(lobby_info.ready_players))
                           <> "/"
-                          <> int.to_string(set.size(lobby_state.players))
+                          <> int.to_string(set.size(lobby_info.players))
                           <> " • Status: "
-                          <> lobby.status_to_string(lobby_state.status),
+                          <> lobby.status_to_string(lobby_info.status),
                         ),
                       ]),
                     ]),
@@ -287,8 +374,11 @@ fn view_lobby_name_input(
 
 fn view_game(model: AppModel) -> Element(AppMsg) {
   case model.current_lobby {
-    Some(lobby_id) ->
-      server_component.element([server_component.route("/ws" <> lobby_id)], [])
+    Some(lobby_info) ->
+      server_component.element(
+        [server_component.route("/ws" <> lobby_info.name)],
+        [],
+      )
     None -> html.div([], [])
   }
 }

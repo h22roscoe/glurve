@@ -1,4 +1,3 @@
-import app/app_shared_message.{type AppSharedMsg}
 import app/app_socket
 import game/game_socket
 import gleam/erlang/process.{type Subject}
@@ -8,10 +7,11 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
-import lobby/lobby
+import lobby/lobby.{type LobbyMsg}
 import lobby/lobby_manager.{type LobbyManagerMsg}
 import mist
 import router
+import shared_messages.{type AppSharedMsg}
 import wisp
 import wisp/wisp_mist
 
@@ -53,7 +53,7 @@ pub fn main() {
 
 fn serve_app_ws(
   req: request.Request(mist.Connection),
-  topic: Topic(AppSharedMsg),
+  topic: Topic(AppSharedMsg(LobbyMsg)),
   lobby_manager: Started(Subject(LobbyManagerMsg)),
 ) -> response.Response(mist.ResponseData) {
   let assert Some(user_id) =

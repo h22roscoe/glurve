@@ -1,13 +1,14 @@
-import app/app_shared_message.{type AppSharedMsg, LobbyManagerSharedMsg}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
-import lobby/lobby_manager_shared_message.{LobbyCreated, LobbyRemoved}
+import shared_messages.{
+  type AppSharedMsg, LobbyCreated, LobbyManagerSharedMsg, LobbyRemoved,
+}
 
 pub fn start(
-  topic: Topic(AppSharedMsg),
+  topic: Topic(AppSharedMsg(LobbyMsg)),
 ) -> actor.Started(process.Subject(LobbyManagerMsg)) {
   let state = LobbyManagerState(lobbies: dict.new(), topic: topic)
   let assert Ok(actor) =
@@ -20,7 +21,7 @@ pub fn start(
 pub opaque type LobbyManagerState {
   LobbyManagerState(
     lobbies: dict.Dict(String, actor.Started(process.Subject(LobbyMsg))),
-    topic: glubsub.Topic(AppSharedMsg),
+    topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
   )
 }
 
@@ -40,7 +41,7 @@ fn handle_lobby_manager_msg(
 ) -> actor.Next(LobbyManagerState, LobbyManagerMsg) {
   case msg {
     CreateLobby(name, max_players) -> {
-      let lobby = lobby.start(name, max_players)
+      let lobby = lobby.start(name, max_players, state.topic)
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
@@ -75,6 +76,10 @@ pub fn create_lobby(
   max_players: Int,
 ) -> Nil {
   process.send(subject, CreateLobby(name, max_players))
+}
+
+pub fn remove_lobby(subject: Subject(LobbyManagerMsg), name: String) -> Nil {
+  process.send(subject, RemoveLobby(name))
 }
 
 pub fn list_lobbies(
