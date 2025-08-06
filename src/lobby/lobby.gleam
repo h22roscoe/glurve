@@ -28,7 +28,7 @@ pub fn start(name: String, max_players: Int) -> Started(Subject(LobbyMsg)) {
   actor
 }
 
-pub opaque type LobbyInfo {
+pub type LobbyInfo {
   LobbyInfo(
     name: String,
     players: Set(String),
@@ -46,12 +46,21 @@ pub opaque type LobbyStatus {
   Playing
 }
 
+pub fn status_to_string(status: LobbyStatus) -> String {
+  case status {
+    Waiting -> "Waiting"
+    Full -> "Full"
+    Playing -> "Playing"
+  }
+}
+
 pub type LobbyMsg {
   JoinLobby(player_id: String)
   LeaveLobby(player_id: String)
   PlayerReady(player_id: String)
   PlayerNotReady(player_id: String)
   GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
+  GetLobbyInfo(reply_with: Subject(LobbyInfo))
   CloseLobby
 }
 
@@ -133,6 +142,10 @@ fn handle_lobby_msg(
       process.send(reply_with, topic)
       actor.continue(state)
     }
+    GetLobbyInfo(reply_with) -> {
+      process.send(reply_with, state)
+      actor.continue(state)
+    }
     CloseLobby -> {
       let assert Ok(_) = glubsub.broadcast(state.topic, LobbyClosed)
       actor.stop()
@@ -144,4 +157,8 @@ pub fn get_game_topic(
   subject: Subject(LobbyMsg),
 ) -> glubsub.Topic(GameSharedMsg) {
   actor.call(subject, 1000, GetGameTopic)
+}
+
+pub fn get_lobby_info(subject: Subject(LobbyMsg)) -> LobbyInfo {
+  actor.call(subject, 1000, GetLobbyInfo)
 }

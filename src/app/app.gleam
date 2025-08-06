@@ -2,10 +2,13 @@ import app/app_shared_message.{type AppSharedMsg}
 import game/game.{type GameMsg}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/int
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor.{type Started}
+import gleam/set
 import glubsub.{type Topic}
-import lobby/lobby.{type LobbyMsg, PlayerReady}
+import lobby/lobby.{type LobbyMsg, JoinLobby, LeaveLobby, PlayerReady}
 import lobby/lobby_manager.{type LobbyManagerMsg, CreateLobby}
 import lustre.{type App}
 import lustre/attribute
@@ -104,15 +107,57 @@ fn update_lobby_msg(
 
 fn view(model: AppModel) -> Element(AppMsg) {
   case model.state {
-    InLobby -> view_lobby(model.current_lobby, model.player_id)
-    InGame -> view_game(model.current_lobby)
+    InLobby -> view_lobby(model)
+    InGame -> view_game(model)
   }
 }
 
-fn view_lobby(
-  current_lobby: Option(String),
-  player_id: String,
-) -> Element(AppMsg) {
+fn view_lobby(model: AppModel) -> Element(AppMsg) {
+  let player_id = model.player_id
+  let current_lobby = model.current_lobby
+  let lobbies = model.lobbies
+  let num_lobbies = dict.size(lobbies)
+  let lobbies_list = case num_lobbies {
+    0 ->
+      html.p([attribute.style("color", "#718096")], [
+        html.text("Loading lobbies..."),
+      ])
+    _ ->
+      html.div(
+        [attribute.id("lobbies-list"), attribute.class("lobby-list")],
+        {
+          use lobby_id, lobby <- dict.map_values(lobbies)
+          let lobby_state = lobby.get_lobby_info(lobby.data)
+          html.div([attribute.class("lobby-item")], [
+            html.div([attribute.class("lobby-info")], [
+              html.h3([], [html.text(lobby_id)]),
+              html.p([], [
+                html.text(
+                  "Players: "
+                  <> int.to_string(set.size(lobby_state.players))
+                  <> "/"
+                  <> int.to_string(lobby_state.max_players)
+                  <> " • Status: "
+                  <> lobby.status_to_string(lobby_state.status),
+                ),
+              ]),
+            ]),
+            html.button(
+              [
+                attribute.class("btn"),
+                event.on_click(LobbyMsg(JoinLobby(lobby_id))),
+              ],
+              [html.text("Join")],
+            ),
+          ])
+        }
+          |> dict.to_list
+          |> list.map(fn(tup) {
+            let #(_lobby_id, elems) = tup
+            elems
+          }),
+      )
+  }
   html.html([attribute.lang("en")], [
     html.head([], [
       html.meta([attribute.charset("utf-8")]),
@@ -129,21 +174,21 @@ fn view_lobby(
     html.body([], [
       html.div([attribute.class("container")], [
         html.div([attribute.class("header")], [
-          html.h1([], [html.text("🎮 Glurve Fever Lobby")]),
-          html.p([], [html.text("Create or join a multiplayer game")]),
+          html.h1([], [html.text("🎮 Glurve Fever")]),
+          html.p([], [html.text("Create a lobby or join an existing one")]),
         ]),
         html.div([attribute.class("content")], [
           html.div([attribute.class("section")], [
-            html.h2([], [html.text("Create New Game")]),
+            html.h2([], [html.text("Create New Lobby")]),
             html.form([attribute.id("create-form")], [
               html.div([attribute.class("form-group")], [
-                html.label([attribute.for("game-name")], [
-                  html.text("Game Name"),
+                html.label([attribute.for("lobby-name")], [
+                  html.text("Lobby Name"),
                 ]),
                 html.input([
                   attribute.type_("text"),
-                  attribute.id("game-name"),
-                  attribute.placeholder("Enter game name"),
+                  attribute.id("lobby-name"),
+                  attribute.placeholder("Enter lobby name"),
                   attribute.required(True),
                 ]),
               ]),
@@ -156,40 +201,27 @@ fn view_lobby(
                 [html.text("Create Game")],
               ),
             ]),
-            html.div(
-              [
-                attribute.class("section"),
-                attribute.style("margin-top", "20px"),
-              ],
-              [
-                html.h2([], [html.text("Quick Actions")]),
-                html.button(
-                  [
-                    attribute.id("refresh-games"),
-                    attribute.class("btn btn-secondary"),
-                  ],
-                  [html.text("Refresh Games")],
-                ),
-                html.button(
-                  [
-                    attribute.id("leave-game"),
-                    attribute.class("btn btn-secondary"),
-                    attribute.style("margin-left", "10px"),
-                  ],
-                  [html.text("Leave Current Game")],
-                ),
-              ],
-            ),
           ]),
           html.div([attribute.class("section")], [
-            html.h2([], [html.text("Current Game")]),
-            html.div([attribute.id("current-game-info")], [
+            html.h2([], [html.text("Current Lobby")]),
+            html.div([attribute.id("current-lobby-info")], [
               case current_lobby {
-                Some(lobby_id) ->
-                  html.div([attribute.class("game-item current-game")], [
-                    html.div([attribute.class("game-info")], [
-                      html.h3([], [html.text("🎯 Current Game: test")]),
-                      html.p([], [html.text("Players: 0/4 • Status: test")]),
+                Some(lobby_id) -> {
+                  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+                  let lobby_state = lobby.get_lobby_info(lobby.data)
+                  html.div([attribute.class("lobby-item current-lobby")], [
+                    html.div([attribute.class("lobby-info")], [
+                      html.h3([], [html.text("🎯 Current Lobby: " <> lobby_id)]),
+                      html.p([], [
+                        html.text(
+                          "Ready players: "
+                          <> int.to_string(set.size(lobby_state.ready_players))
+                          <> "/"
+                          <> int.to_string(set.size(lobby_state.players))
+                          <> " • Status: "
+                          <> lobby.status_to_string(lobby_state.status),
+                        ),
+                      ]),
                     ]),
                     html.button(
                       [
@@ -198,35 +230,40 @@ fn view_lobby(
                       ],
                       [html.text("Ready")],
                     ),
+                    html.button(
+                      [
+                        attribute.id("leave-lobby"),
+                        attribute.class("btn btn-secondary"),
+                        attribute.style("margin-left", "10px"),
+                        event.on_click(LobbyMsg(LeaveLobby(player_id))),
+                      ],
+                      [html.text("Leave lobby")],
+                    ),
                   ])
+                }
                 None ->
                   html.p([attribute.style("color", "#718096")], [
-                    html.text("Join a game to start playing!"),
+                    html.text("Join a lobby to start playing!"),
                   ])
               },
             ]),
           ]),
           html.div([attribute.class("section")], [
-            html.h2([], [html.text("Available Games")]),
+            html.h2([], [html.text("Available Lobbies")]),
             html.div(
-              [attribute.id("games-list"), attribute.class("game-list")],
-              [
-                html.p([attribute.style("color", "#718096")], [
-                  html.text("Loading games..."),
-                ]),
-              ],
+              [attribute.id("lobbies-list"), attribute.class("lobby-list")],
+              [lobbies_list],
             ),
           ]),
         ]),
         html.div([attribute.id("status"), attribute.class("status")], []),
       ]),
-      html.script([attribute.src("/static/lobby.js")], ""),
     ]),
   ])
 }
 
-fn view_game(current_lobby: Option(String)) -> Element(AppMsg) {
-  case current_lobby {
+fn view_game(model: AppModel) -> Element(AppMsg) {
+  case model.current_lobby {
     Some(lobby_id) ->
       server_component.element([server_component.route("/ws" <> lobby_id)], [])
     None -> html.div([], [])
