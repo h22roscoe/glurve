@@ -6,6 +6,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor.{type Started}
+import gleam/pair
 import gleam/set
 import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg, JoinLobby, LeaveLobby, PlayerReady}
@@ -152,10 +153,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
           ])
         }
           |> dict.to_list
-          |> list.map(fn(tup) {
-            let #(_lobby_id, elems) = tup
-            elems
-          }),
+          |> list.map(pair.second),
       )
   }
   html.html([attribute.lang("en")], [
