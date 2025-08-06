@@ -12,7 +12,7 @@ pub type LobbyManagerSharedMsg(m) {
 }
 
 pub type LobbySharedMsg {
-  LobbyJoined(player_id: String)
+  LobbyJoined(player_id: String, lobby_id: String)
   LobbyLeft(player_id: String)
   PlayerBecameReady(player_id: String)
   PlayerBecameNotReady(player_id: String)

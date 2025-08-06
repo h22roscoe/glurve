@@ -9,8 +9,8 @@ import gleam/pair
 import gleam/set
 import glubsub.{type Topic}
 import lobby/lobby.{
-  type LobbyInfo, type LobbyMsg, JoinLobby, LeaveLobby, PlayerNotReady,
-  PlayerReady,
+  type LobbyInfo, type LobbyMsg, CloseLobby, GetGameTopic, GetLobbyInfo,
+  JoinLobby, LeaveLobby, LobbyInfo, PlayerNotReady, PlayerReady,
 }
 import lobby/lobby_manager.{
   type LobbyManagerMsg, CreateLobby, ListLobbies, RemoveLobby,
@@ -55,6 +55,7 @@ pub type AppModel {
     lobbies: dict.Dict(String, Started(Subject(lobby.LobbyMsg))),
     current_lobby: Option(LobbyInfo),
     lobby_manager: Started(Subject(LobbyManagerMsg)),
+    topic: Topic(AppSharedMsg(LobbyMsg)),
   )
 }
 
@@ -85,6 +86,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobbies: dict.new(),
       current_lobby: None,
       lobby_manager: args.lobby_manager,
+      topic: args.topic,
     )
   #(model, subscribe(args.topic, RecievedAppSharedMsg))
 }
@@ -128,14 +130,61 @@ fn update_lobby_shared_msg(
   msg: LobbySharedMsg,
 ) -> #(AppModel, Effect(AppMsg)) {
   case model.current_lobby {
-    None -> #(model, effect.none())
-    Some(_) -> {
+    None -> {
       case msg {
-        LobbyJoined(_)
-        | LobbyLeft(_)
-        | PlayerBecameReady(_)
-        | PlayerBecameNotReady(_) -> {
+        LobbyJoined(player_id, lobby_id) if player_id == model.player_id -> {
+          let assert Ok(lobby) = dict.get(model.lobbies, lobby_id)
+          let lobby_info = lobby.get_lobby_info(lobby.data)
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
+        }
+        _ -> #(model, effect.none())
+      }
+    }
+    Some(lobby_info) -> {
+      case msg {
+        LobbyJoined(player_id, lobby_id) if lobby_id == lobby_info.name -> {
+          let lobby_info =
+            LobbyInfo(
+              ..lobby_info,
+              players: set.insert(lobby_info.players, player_id),
+            )
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
+        }
+        LobbyJoined(_, _) -> {
           #(model, effect.none())
+        }
+        LobbyLeft(player_id) -> {
+          case player_id == model.player_id {
+            True -> #(AppModel(..model, current_lobby: None), effect.none())
+
+            False -> {
+              let lobby_info =
+                LobbyInfo(
+                  ..lobby_info,
+                  players: set.delete(lobby_info.players, player_id),
+                )
+              #(
+                AppModel(..model, current_lobby: Some(lobby_info)),
+                effect.none(),
+              )
+            }
+          }
+        }
+        PlayerBecameReady(player_id) -> {
+          let lobby_info =
+            LobbyInfo(
+              ..lobby_info,
+              ready_players: set.insert(lobby_info.ready_players, player_id),
+            )
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
+        }
+        PlayerBecameNotReady(player_id) -> {
+          let lobby_info =
+            LobbyInfo(
+              ..lobby_info,
+              ready_players: set.delete(lobby_info.ready_players, player_id),
+            )
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
         }
         AllPlayersReady -> {
           #(AppModel(..model, state: InGame), effect.none())
@@ -191,7 +240,70 @@ fn update_lobby_msg(
   model: AppModel,
   msg: LobbyMsg,
 ) -> #(AppModel, Effect(AppMsg)) {
-  todo
+  case msg {
+    JoinLobby(player_id, lobby_id) -> {
+      #(model, join_lobby_effect(player_id, lobby_id, model.topic))
+    }
+    LeaveLobby(player_id) -> {
+      #(model, leave_lobby_effect(player_id, model.topic))
+    }
+    PlayerReady(player_id) -> {
+      #(model, player_ready_effect(player_id, model.topic))
+    }
+    PlayerNotReady(player_id) -> {
+      #(model, player_not_ready_effect(player_id, model.topic))
+    }
+    GetGameTopic(_) -> {
+      #(model, effect.none())
+    }
+    GetLobbyInfo(_) -> {
+      #(model, effect.none())
+    }
+    CloseLobby -> {
+      #(model, close_lobby_effect(model.topic))
+    }
+  }
+}
+
+fn join_lobby_effect(
+  player_id: String,
+  lobby_id: String,
+  topic: Topic(AppSharedMsg(LobbyMsg)),
+) {
+  use _dispatch <- effect.from
+  let assert Ok(_) =
+    glubsub.broadcast(topic, LobbySharedMsg(LobbyJoined(player_id, lobby_id)))
+  Nil
+}
+
+fn leave_lobby_effect(player_id: String, topic: Topic(AppSharedMsg(LobbyMsg))) {
+  use _dispatch <- effect.from
+  let assert Ok(_) =
+    glubsub.broadcast(topic, LobbySharedMsg(LobbyLeft(player_id)))
+  Nil
+}
+
+fn player_ready_effect(player_id: String, topic: Topic(AppSharedMsg(LobbyMsg))) {
+  use _dispatch <- effect.from
+  let assert Ok(_) =
+    glubsub.broadcast(topic, LobbySharedMsg(PlayerBecameReady(player_id)))
+  Nil
+}
+
+fn player_not_ready_effect(
+  player_id: String,
+  topic: Topic(AppSharedMsg(LobbyMsg)),
+) {
+  use _dispatch <- effect.from
+  let assert Ok(_) =
+    glubsub.broadcast(topic, LobbySharedMsg(PlayerBecameNotReady(player_id)))
+  Nil
+}
+
+fn close_lobby_effect(topic: Topic(AppSharedMsg(LobbyMsg))) {
+  use _dispatch <- effect.from
+  let assert Ok(_) = glubsub.broadcast(topic, LobbySharedMsg(LobbyClosed))
+  Nil
 }
 
 fn view(model: AppModel) -> Element(AppMsg) {
@@ -234,7 +346,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
             html.button(
               [
                 attribute.class("btn"),
-                event.on_click(LobbyMsg(JoinLobby(lobby_id))),
+                event.on_click(LobbyMsg(JoinLobby(model.player_id, lobby_id))),
               ],
               [html.text("Join")],
             ),

@@ -5,7 +5,7 @@ import gleam/set.{type Set}
 import glubsub.{type Topic}
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
-  LobbyManagerSharedMsg, LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
+  LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
 }
 
 pub fn start(
@@ -32,7 +32,7 @@ pub fn start(
 }
 
 pub type LobbyMsg {
-  JoinLobby(player_id: String)
+  JoinLobby(player_id: String, lobby_id: String)
   LeaveLobby(player_id: String)
   PlayerReady(player_id: String)
   PlayerNotReady(player_id: String)
@@ -72,7 +72,7 @@ fn handle_lobby_msg(
   msg: LobbyMsg,
 ) -> actor.Next(LobbyInfo, LobbyMsg) {
   case msg {
-    JoinLobby(player_id) -> {
+    JoinLobby(player_id, lobby_id) -> {
       case state.status {
         Waiting -> {
           let new_info =
@@ -81,7 +81,7 @@ fn handle_lobby_msg(
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(LobbyJoined(player_id)),
+              LobbySharedMsg(LobbyJoined(player_id, lobby_id)),
             )
           case num_players {
             _ if num_players >= state.max_players -> {
