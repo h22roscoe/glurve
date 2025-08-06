@@ -72,7 +72,7 @@ fn handle_lobby_msg(
   msg: LobbyMsg,
 ) -> actor.Next(LobbyInfo, LobbyMsg) {
   case msg {
-    JoinLobby(player_id, lobby_id) -> {
+    JoinLobby(player_id, lobby_id) if lobby_id == state.name -> {
       case state.status {
         Waiting -> {
           let new_info =
@@ -81,17 +81,20 @@ fn handle_lobby_msg(
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(LobbyJoined(player_id, lobby_id)),
+              LobbySharedMsg(LobbyJoined(player_id, state.name)),
             )
           case num_players {
             _ if num_players >= state.max_players -> {
               actor.continue(LobbyInfo(..new_info, status: Full))
             }
-            _ -> actor.continue(state)
+            _ -> actor.continue(new_info)
           }
         }
         _ -> actor.continue(state)
       }
+    }
+    JoinLobby(_, _) -> {
+      actor.continue(state)
     }
     LeaveLobby(player_id) -> {
       let new_players = set.delete(state.players, player_id)
@@ -168,6 +171,26 @@ fn handle_lobby_msg(
   }
 }
 
+pub fn join_lobby(
+  subject: Subject(LobbyMsg),
+  player_id: String,
+  lobby_id: String,
+) -> Nil {
+  actor.send(subject, JoinLobby(player_id, lobby_id))
+}
+
+pub fn leave_lobby(subject: Subject(LobbyMsg), player_id: String) -> Nil {
+  actor.send(subject, LeaveLobby(player_id))
+}
+
+pub fn player_ready(subject: Subject(LobbyMsg), player_id: String) -> Nil {
+  actor.send(subject, PlayerReady(player_id))
+}
+
+pub fn player_not_ready(subject: Subject(LobbyMsg), player_id: String) -> Nil {
+  actor.send(subject, PlayerNotReady(player_id))
+}
+
 pub fn get_game_topic(
   subject: Subject(LobbyMsg),
 ) -> glubsub.Topic(GameSharedMsg) {
@@ -176,4 +199,8 @@ pub fn get_game_topic(
 
 pub fn get_lobby_info(subject: Subject(LobbyMsg)) -> LobbyInfo {
   actor.call(subject, 1000, GetLobbyInfo)
+}
+
+pub fn close_lobby(subject: Subject(LobbyMsg)) -> Nil {
+  actor.send(subject, CloseLobby)
 }

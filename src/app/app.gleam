@@ -83,7 +83,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
     AppModel(
       state: InLobby,
       player_id: args.user_id,
-      lobbies: dict.new(),
+      lobbies: lobby_manager.list_lobbies(args.lobby_manager.data),
       current_lobby: None,
       lobby_manager: args.lobby_manager,
       topic: args.topic,
@@ -242,13 +242,29 @@ fn update_lobby_msg(
 ) -> #(AppModel, Effect(AppMsg)) {
   case msg {
     JoinLobby(player_id, lobby_id) -> {
-      #(model, join_lobby_effect(player_id, lobby_id, model.topic))
+      #(model, join_lobby_effect(player_id, lobby_id, model.lobbies))
     }
     LeaveLobby(player_id) -> {
-      #(model, leave_lobby_effect(player_id, model.topic))
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(
+            model,
+            leave_lobby_effect(player_id, lobby_info.name, model.lobbies),
+          )
+        }
+        None -> #(model, effect.none())
+      }
     }
     PlayerReady(player_id) -> {
-      #(model, player_ready_effect(player_id, model.topic))
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(
+            model,
+            player_ready_effect(player_id, lobby_info.name, model.lobbies),
+          )
+        }
+        None -> #(model, effect.none())
+      }
     }
     PlayerNotReady(player_id) -> {
       #(model, player_not_ready_effect(player_id, model.topic))
@@ -260,7 +276,12 @@ fn update_lobby_msg(
       #(model, effect.none())
     }
     CloseLobby -> {
-      #(model, close_lobby_effect(model.topic))
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(model, close_lobby_effect(lobby_info.name, model.lobbies))
+        }
+        None -> #(model, effect.none())
+      }
     }
   }
 }
@@ -268,25 +289,33 @@ fn update_lobby_msg(
 fn join_lobby_effect(
   player_id: String,
   lobby_id: String,
-  topic: Topic(AppSharedMsg(LobbyMsg)),
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
 ) {
   use _dispatch <- effect.from
-  let assert Ok(_) =
-    glubsub.broadcast(topic, LobbySharedMsg(LobbyJoined(player_id, lobby_id)))
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.join_lobby(lobby.data, player_id, lobby_id)
   Nil
 }
 
-fn leave_lobby_effect(player_id: String, topic: Topic(AppSharedMsg(LobbyMsg))) {
+fn leave_lobby_effect(
+  player_id: String,
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
+) {
   use _dispatch <- effect.from
-  let assert Ok(_) =
-    glubsub.broadcast(topic, LobbySharedMsg(LobbyLeft(player_id)))
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.leave_lobby(lobby.data, player_id)
   Nil
 }
 
-fn player_ready_effect(player_id: String, topic: Topic(AppSharedMsg(LobbyMsg))) {
+fn player_ready_effect(
+  player_id: String,
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
+) {
   use _dispatch <- effect.from
-  let assert Ok(_) =
-    glubsub.broadcast(topic, LobbySharedMsg(PlayerBecameReady(player_id)))
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.player_ready(lobby.data, player_id)
   Nil
 }
 
@@ -300,9 +329,13 @@ fn player_not_ready_effect(
   Nil
 }
 
-fn close_lobby_effect(topic: Topic(AppSharedMsg(LobbyMsg))) {
+fn close_lobby_effect(
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
+) {
   use _dispatch <- effect.from
-  let assert Ok(_) = glubsub.broadcast(topic, LobbySharedMsg(LobbyClosed))
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.close_lobby(lobby.data)
   Nil
 }
 
@@ -378,21 +411,11 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
         html.div([attribute.class("content")], [
           html.div([attribute.class("section")], [
             html.h2([], [html.text("Create New Lobby")]),
-            html.form([attribute.id("create-form")], [
-              html.div([attribute.class("form-group")], [
-                html.label([attribute.for("lobby-name")], [
-                  html.text("Lobby Name"),
-                ]),
-                view_lobby_name_input(create_lobby),
+            html.div([attribute.class("form-group")], [
+              html.label([attribute.for("lobby-name")], [
+                html.text("Lobby Name"),
               ]),
-              html.button(
-                [
-                  attribute.type_("submit"),
-                  attribute.class("btn"),
-                  event.on_click(LobbyManagerMsg(CreateLobby("test", 4))),
-                ],
-                [html.text("Create Game")],
-              ),
+              view_lobby_name_input(create_lobby),
             ]),
           ]),
           html.div([attribute.class("section")], [
@@ -430,7 +453,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
                         attribute.style("margin-left", "10px"),
                         event.on_click(LobbyMsg(LeaveLobby(player_id))),
                       ],
-                      [html.text("Leave lobby")],
+                      [html.text("Leave")],
                     ),
                   ])
                 }
@@ -488,7 +511,7 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
   case model.current_lobby {
     Some(lobby_info) ->
       server_component.element(
-        [server_component.route("/ws" <> lobby_info.name)],
+        [server_component.route("/ws/" <> lobby_info.name)],
         [],
       )
     None -> html.div([], [])

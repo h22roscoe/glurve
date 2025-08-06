@@ -20,7 +20,7 @@ pub fn start(
 
 pub opaque type LobbyManagerState {
   LobbyManagerState(
-    lobbies: dict.Dict(String, actor.Started(process.Subject(LobbyMsg))),
+    lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
     topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
   )
 }
@@ -29,9 +29,7 @@ pub type LobbyManagerMsg {
   CreateLobby(name: String, max_players: Int)
   RemoveLobby(name: String)
   ListLobbies(
-    reply_with: process.Subject(
-      dict.Dict(String, actor.Started(process.Subject(LobbyMsg))),
-    ),
+    reply_with: Subject(dict.Dict(String, Started(Subject(LobbyMsg)))),
   )
 }
 
