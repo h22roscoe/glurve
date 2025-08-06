@@ -26,6 +26,8 @@ const height = 500
 
 const width = 500
 
+const head_size = 10.0
+
 const tick_delay_ms = 10
 
 pub type StartArgs {
@@ -43,7 +45,6 @@ pub fn component() -> App(StartArgs, Model, GameMsg) {
 
 pub type GameMsg {
   RecievedSharedMsg(GameSharedMsg)
-  KickOffGame
   NewTimer(time.TimerID)
   NewCountdownTimer(time.TimerID)
   CountdownTick
@@ -67,7 +68,6 @@ pub type Model {
 }
 
 pub type GameState {
-  NotStarted
   Countdown(Int)
   Playing
   Crashed
@@ -97,7 +97,7 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
   let model =
     Model(
       topic: start_args.topic,
-      game_state: NotStarted,
+      game_state: Countdown(3),
       player_id: start_args.id,
       players: start_args.players,
       timer: None,
@@ -105,7 +105,14 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
       seed: start_args.seed,
     )
 
-  #(model, subscribe(start_args.topic, RecievedSharedMsg))
+  #(
+    model,
+    effect.batch([
+      subscribe(start_args.topic, RecievedSharedMsg),
+      countdown_effect(),
+      tick_effect(),
+    ]),
+  )
 }
 
 fn tick_effect() -> Effect(GameMsg) {
@@ -179,19 +186,6 @@ fn handle_shared_msg(
       }
     }
 
-    game_shared_message.StartedGame -> {
-      #(
-        Model(
-          ..model,
-          game_state: Countdown(3),
-          // Will be set by the NewTimer message
-          timer: None,
-          countdown_timer: None,
-        ),
-        effect.batch([countdown_effect(), tick_effect()]),
-      )
-    }
-
     game_shared_message.PlayerTurning(player_id, direction) -> {
       case player_id == model.player_id {
         True -> #(model, effect.none())
@@ -237,11 +231,6 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
         _ -> #(model, effect.none())
       }
     }
-
-    KickOffGame -> #(
-      model,
-      broadcast(model.topic, game_shared_message.StartedGame),
-    )
 
     RecievedSharedMsg(shared_msg) -> handle_shared_msg(model, shared_msg)
 
@@ -354,29 +343,6 @@ fn view(model: Model) -> Element(GameMsg) {
     })
 
   let player_elements = list.flat_map(dict.values(model.players), draw_player)
-  let num_players = dict.size(model.players)
-  let players_list =
-    dict.values(model.players)
-    |> list.map(fn(p: player.Player) { p.id })
-    |> list.index_map(fn(id, idx) {
-      overlay_text_with_index("Player: " <> id, idx, num_players)
-    })
-
-  let start_text_element =
-    svg.text(
-      [
-        attribute.attribute("x", "50%"),
-        attribute.attribute("y", "50%"),
-        attribute.attribute("text-anchor", "middle"),
-        attribute.attribute("dominant-baseline", "middle"),
-        attribute.attribute("font-size", "24"),
-        attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "black"),
-        attribute.style("cursor", "pointer"),
-        event.on_click(KickOffGame),
-      ],
-      "Click to Start",
-    )
 
   let game_over_text_element =
     svg.text(
@@ -422,9 +388,6 @@ fn view(model: Model) -> Element(GameMsg) {
     )
 
   let overlay_elements = case model.game_state {
-    NotStarted -> {
-      [#("start", start_text_element), ..players_list]
-    }
     Countdown(count) -> {
       draw_countdown(count)
     }
@@ -458,8 +421,7 @@ fn view(model: Model) -> Element(GameMsg) {
 
   let svg_children = case model.game_state {
     Ended -> overlay_elements
-    Countdown(_) | NotStarted ->
-      list.flatten([overlay_elements, player_elements])
+    Countdown(_) -> list.flatten([overlay_elements, player_elements])
     _ -> player_elements
   }
 
@@ -497,34 +459,6 @@ fn view(model: Model) -> Element(GameMsg) {
       svg_children,
     )])
 }
-
-fn overlay_text_with_index(
-  text: String,
-  idx: Int,
-  total: Int,
-) -> #(String, Element(GameMsg)) {
-  let offset = 50.0
-  let spacing = 50.0
-  let percentage =
-    offset +. { spacing *. int.to_float(idx + 1) /. int.to_float(total + 1) }
-  let y = float.to_string(percentage) <> "%"
-  let text_element =
-    svg.text(
-      [
-        attribute.attribute("x", "50%"),
-        attribute.attribute("y", y),
-        attribute.attribute("text-anchor", "middle"),
-        attribute.attribute("dominant-baseline", "middle"),
-        attribute.attribute("font-size", "12"),
-        attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "black"),
-      ],
-      text,
-    )
-  #(text <> int.to_string(idx), text_element)
-}
-
-const head_size = 10.0
 
 /// Draws the player by creating a list of SVG elements that represent
 /// the player's head and tail. The first element of each tuple is a string
