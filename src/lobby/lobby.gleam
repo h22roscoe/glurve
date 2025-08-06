@@ -34,8 +34,8 @@ pub opaque type LobbyInfo {
     ready_players: Set(String),
     max_players: Int,
     status: LobbyStatus,
-    topic: glubsub.Topic(LobbyMsg),
-    game_topic: glubsub.Topic(game_message.SharedMsg),
+    topic: glubsub.Topic(LobbySharedMsg),
+    game_topic: glubsub.Topic(game_message.GameSharedMsg),
   )
 }
 
@@ -45,12 +45,20 @@ pub opaque type LobbyStatus {
   Playing
 }
 
+pub opaque type LobbySharedMsg {
+  LobbyJoined(player_id: String)
+  LobbyLeft(player_id: String)
+  PlayerBecameReady(player_id: String)
+  PlayerBecameNotReady(player_id: String)
+  AllPlayersReady
+  LobbyClosed
+}
+
 pub opaque type LobbyMsg {
   JoinLobby(player_id: String)
   LeaveLobby(player_id: String)
   PlayerReady(player_id: String)
   PlayerNotReady(player_id: String)
-  AllReady
   CloseLobby
 }
 
@@ -66,7 +74,7 @@ fn handle_lobby_msg(
             LobbyInfo(..state, players: set.insert(state.players, player_id))
           let num_players = set.size(new_info.players)
           let assert Ok(_) =
-            glubsub.broadcast(state.topic, JoinLobby(player_id))
+            glubsub.broadcast(state.topic, LobbyJoined(player_id))
           case num_players {
             _ if num_players >= state.max_players -> {
               actor.continue(LobbyInfo(..new_info, status: Full))
@@ -91,23 +99,31 @@ fn handle_lobby_msg(
           ready_players: new_ready_players,
           status: new_status,
         )
-      let assert Ok(_) = glubsub.broadcast(state.topic, LeaveLobby(player_id))
+      let assert Ok(_) = glubsub.broadcast(state.topic, LobbyLeft(player_id))
       actor.continue(new_info)
     }
     PlayerReady(player_id) -> {
       let total_players = set.size(state.players)
-      let new_info =
-        LobbyInfo(
-          ..state,
-          ready_players: set.insert(state.ready_players, player_id),
-        )
+      let new_ready_players = set.insert(state.ready_players, player_id)
 
-      let all_ready = set.size(new_info.ready_players) == total_players
-      let assert Ok(_) = case all_ready {
-        True -> glubsub.broadcast(state.topic, AllReady)
-        False -> glubsub.broadcast(state.topic, PlayerReady(player_id))
+      let all_ready = set.size(new_ready_players) == total_players
+      case all_ready {
+        True -> {
+          let assert Ok(_) = glubsub.broadcast(state.topic, AllPlayersReady)
+          let new_state =
+            LobbyInfo(
+              ..state,
+              status: Playing,
+              ready_players: new_ready_players,
+            )
+          actor.continue(new_state)
+        }
+        False -> {
+          let assert Ok(_) =
+            glubsub.broadcast(state.topic, PlayerBecameReady(player_id))
+          actor.continue(LobbyInfo(..state, ready_players: new_ready_players))
+        }
       }
-      actor.continue(new_info)
     }
     PlayerNotReady(player_id) -> {
       let new_info =
@@ -116,15 +132,11 @@ fn handle_lobby_msg(
           ready_players: set.delete(state.ready_players, player_id),
         )
       let assert Ok(_) =
-        glubsub.broadcast(state.topic, PlayerNotReady(player_id))
-      actor.continue(new_info)
-    }
-    AllReady -> {
-      let new_info = LobbyInfo(..state, status: Playing)
+        glubsub.broadcast(state.topic, PlayerBecameNotReady(player_id))
       actor.continue(new_info)
     }
     CloseLobby -> {
-      let assert Ok(_) = glubsub.broadcast(state.topic, CloseLobby)
+      let assert Ok(_) = glubsub.broadcast(state.topic, LobbyClosed)
       actor.stop()
     }
   }

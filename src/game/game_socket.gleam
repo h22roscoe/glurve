@@ -24,7 +24,7 @@ pub type GameSocketInit =
 pub fn init_game_socket(
   _,
   id: String,
-  topic: glubsub.Topic(game_message.SharedMsg),
+  topic: glubsub.Topic(game_message.GameSharedMsg),
 ) -> GameSocketInit {
   let game = game.component()
 

@@ -12,7 +12,7 @@ pub fn apply_interval(
 ) -> Result(TimerID, String)
 
 pub type GameMsg {
-  RecievedSharedMsg(SharedMsg)
+  RecievedSharedMsg(GameSharedMsg)
   KickOffGame
   NewTimer(TimerID)
   NewCountdownTimer(TimerID)
@@ -24,7 +24,7 @@ pub type GameMsg {
   NoOp
 }
 
-pub type SharedMsg {
+pub type GameSharedMsg {
   PlayerJoined(String)
   ExistingPlayer(String)
   PlayerCrashed(String)

@@ -18,9 +18,9 @@ pub type StartArgs {
 }
 
 pub type AppMsg {
-  LobbyManagerMsg(lobby_manager.LobbyManagerMsg)
-  LobbyMsg(lobby.LobbyMsg)
-  GameMsg(game_message.GameMsg)
+  LobbyManagerMsg(lobby_manager.LobbyManagerSharedMsg)
+  LobbyMsg(lobby.LobbySharedMsg)
+  GameMsg(game_message.GameSharedMsg)
 }
 
 pub type AppState {
@@ -31,7 +31,7 @@ pub type AppState {
 pub type AppModel {
   AppModel(
     state: AppState,
-    lobby: Option(lobby.LobbyInfo),
+    lobby: Option(lobby.Model),
     game: Option(game.Model),
   )
 }

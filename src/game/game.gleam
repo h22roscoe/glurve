@@ -31,7 +31,7 @@ const width = 500
 const tick_delay_ms = 10
 
 pub type StartArgs {
-  StartArgs(id: String, topic: glubsub.Topic(game_message.SharedMsg))
+  StartArgs(id: String, topic: glubsub.Topic(game_message.GameSharedMsg))
 }
 
 pub fn component() -> App(StartArgs, Model, GameMsg) {
@@ -40,7 +40,7 @@ pub fn component() -> App(StartArgs, Model, GameMsg) {
 
 pub type Model {
   Model(
-    topic: glubsub.Topic(game_message.SharedMsg),
+    topic: glubsub.Topic(game_message.GameSharedMsg),
     game_state: GameState,
     player_id: String,
     players: dict.Dict(String, player.Player),
@@ -164,7 +164,7 @@ fn handle_turn(
 
 fn handle_shared_msg(
   model: Model,
-  shared_msg: game_message.SharedMsg,
+  shared_msg: game_message.GameSharedMsg,
 ) -> #(Model, Effect(GameMsg)) {
   case shared_msg {
     game_message.PlayerJoined(player_id) -> #(

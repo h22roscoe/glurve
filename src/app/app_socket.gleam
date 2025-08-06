@@ -24,7 +24,7 @@ pub type AppSocketMessage =
 pub type AppSocketInit =
   #(AppSocket, Option(Selector(AppSocketMessage)))
 
-pub fn init_socket(
+pub fn iGameSharedMsgt(
   _,
   lobby_manager: actor.Started(process.Subject(lobby_manager.LobbyManagerMsg)),
 ) -> AppSocketInit {
