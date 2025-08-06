@@ -1,17 +1,14 @@
-import game/game_message
-import gleam/erlang/process
-import gleam/otp/actor
+import game/game_shared_message.{type GameSharedMsg}
+import gleam/erlang/process.{type Subject}
+import gleam/otp/actor.{type Started}
 import gleam/set.{type Set}
-import glubsub
+import glubsub.{type Topic}
 import lobby/lobby_shared_message.{
   type LobbySharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
   PlayerBecameNotReady, PlayerBecameReady,
 }
 
-pub fn start(
-  name: String,
-  max_players: Int,
-) -> actor.Started(process.Subject(LobbyMsg)) {
+pub fn start(name: String, max_players: Int) -> Started(Subject(LobbyMsg)) {
   let assert Ok(topic) = glubsub.new_topic()
   let assert Ok(game_topic) = glubsub.new_topic()
   let state =
@@ -38,8 +35,8 @@ pub opaque type LobbyInfo {
     ready_players: Set(String),
     max_players: Int,
     status: LobbyStatus,
-    topic: glubsub.Topic(LobbySharedMsg),
-    game_topic: glubsub.Topic(game_message.GameSharedMsg),
+    topic: Topic(LobbySharedMsg),
+    game_topic: Topic(GameSharedMsg),
   )
 }
 
@@ -49,11 +46,12 @@ pub opaque type LobbyStatus {
   Playing
 }
 
-pub opaque type LobbyMsg {
+pub type LobbyMsg {
   JoinLobby(player_id: String)
   LeaveLobby(player_id: String)
   PlayerReady(player_id: String)
   PlayerNotReady(player_id: String)
+  GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
   CloseLobby
 }
 
@@ -130,9 +128,20 @@ fn handle_lobby_msg(
         glubsub.broadcast(state.topic, PlayerBecameNotReady(player_id))
       actor.continue(new_info)
     }
+    GetGameTopic(reply_with) -> {
+      let topic = state.game_topic
+      process.send(reply_with, topic)
+      actor.continue(state)
+    }
     CloseLobby -> {
       let assert Ok(_) = glubsub.broadcast(state.topic, LobbyClosed)
       actor.stop()
     }
   }
+}
+
+pub fn get_game_topic(
+  subject: Subject(LobbyMsg),
+) -> glubsub.Topic(GameSharedMsg) {
+  actor.call(subject, 1000, GetGameTopic)
 }

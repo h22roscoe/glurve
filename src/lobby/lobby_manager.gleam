@@ -1,7 +1,7 @@
 import app/app_shared_message.{type AppSharedMsg, RecievedLobbyManagerMsg}
 import gleam/dict
-import gleam/erlang/process
-import gleam/otp/actor
+import gleam/erlang/process.{type Subject}
+import gleam/otp/actor.{type Started}
 import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
 import lobby/lobby_manager_shared_message.{LobbyCreated, LobbyRemoved}
@@ -70,7 +70,7 @@ fn handle_lobby_manager_msg(
 }
 
 pub fn create_lobby(
-  subject: process.Subject(LobbyManagerMsg),
+  subject: Subject(LobbyManagerMsg),
   name: String,
   max_players: Int,
 ) -> Nil {
@@ -78,7 +78,16 @@ pub fn create_lobby(
 }
 
 pub fn list_lobbies(
-  subject: process.Subject(LobbyManagerMsg),
-) -> dict.Dict(String, actor.Started(process.Subject(LobbyMsg))) {
+  subject: Subject(LobbyManagerMsg),
+) -> dict.Dict(String, Started(Subject(LobbyMsg))) {
   process.call(subject, 1000, ListLobbies)
+}
+
+pub fn get_lobby(
+  subject: Subject(LobbyManagerMsg),
+  lobby_id: String,
+) -> Started(Subject(LobbyMsg)) {
+  let lobbies = list_lobbies(subject)
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby
 }
