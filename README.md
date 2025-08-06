@@ -18,6 +18,7 @@ gleam test  # Run the tests
 - [ ] Add style to game screen
 - [ ] Ability to unready yourself in a lobby
 - [ ] Add resizing game screen capability (based on num players mostly)
+- [ ] Think of ways to add tests
 - [ ] (Longer term) Multiple rounds in a game
 - [ ] (Longer term) Points per round and scoreboard display
 - [ ] (Longer term) Join as spectator
