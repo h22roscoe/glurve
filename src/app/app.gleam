@@ -1,6 +1,7 @@
 import app/app_shared_message.{type AppSharedMsg}
 import game/game.{type GameMsg}
 import gleam/dict
+import gleam/dynamic/decode
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/list
@@ -183,12 +184,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
                 html.label([attribute.for("lobby-name")], [
                   html.text("Lobby Name"),
                 ]),
-                html.input([
-                  attribute.type_("text"),
-                  attribute.id("lobby-name"),
-                  attribute.placeholder("Enter lobby name"),
-                  attribute.required(True),
-                ]),
+                view_lobby_name_input(create_lobby),
               ]),
               html.button(
                 [
@@ -257,6 +253,35 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
         html.div([attribute.id("status"), attribute.class("status")], []),
       ]),
     ]),
+  ])
+}
+
+fn create_lobby(name: String) -> AppMsg {
+  LobbyManagerMsg(CreateLobby(name, 4))
+}
+
+fn view_lobby_name_input(
+  on_submit handle_keydown: fn(String) -> msg,
+) -> Element(msg) {
+  let on_keydown =
+    event.on("keydown", {
+      use key <- decode.field("key", decode.string)
+      use value <- decode.subfield(["target", "value"], decode.string)
+
+      case key {
+        "Enter" if value != "" -> decode.success(handle_keydown(value))
+        _ -> decode.failure(handle_keydown(""), "")
+      }
+    })
+    |> server_component.include(["key", "target.value"])
+
+  html.input([
+    attribute.class("input"),
+    attribute.type_("text"),
+    attribute.id("lobby-name"),
+    attribute.placeholder("Enter lobby name"),
+    attribute.required(True),
+    on_keydown,
   ])
 }
 
