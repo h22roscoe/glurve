@@ -1,0 +1,242 @@
+/* Root theme with provided color scheme */
+:root {
+  /* Provided scheme */
+  /* Gleam Classic-inspired palette converted to HSL */
+  --bg-dark: hsl(223, 49%, 8%);     /* ~#0b1020 */
+  --bg: hsl(223, 45%, 10%);
+  --bg-light: hsl(223, 40%, 15%);
+  --text: hsl(220, 14%, 92%);
+  --text-muted: hsl(220, 12%, 70%);
+  --highlight: hsl(258, 90%, 77%);  /* violet accent */
+  --border: hsl(222, 36%, 26%);
+  --border-muted: hsl(222, 26%, 18%);
+  --primary: hsl(258, 90%, 77%);    /* primary accent */
+  --secondary: hsl(50, 100%, 60%);  /* yellow */
+  --danger: hsl(0, 84%, 63%);       /* red */
+  --warning: hsl(38, 92%, 50%);     /* amber */
+  --success: hsl(142, 76%, 36%);    /* green */
+  --info: hsl(217, 91%, 66%);       /* blue */
+
+  /* App theme vars mapped */
+  --color-bg: var(--bg);
+  --color-surface: var(--bg-dark);
+  --color-panel: var(--bg-light);
+  --color-muted: var(--text-muted);
+  --color-text: var(--text);
+  --color-heading: var(--text);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--highlight);
+  --color-accent: var(--info);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  /* Game-specific mappings */
+  --color-header-bg: color-mix(in oklab, var(--bg-light), black 10%);
+  --color-header-text: var(--text);
+  --color-footer-bg: color-mix(in oklab, var(--bg-light), black 10%);
+  --color-footer-text: var(--text-muted);
+  --btn-exit-bg: var(--danger);
+  --btn-exit-text: #ffffff;
+  --svg-bg: oklch(98.4% 0.003 247.858);
+
+  --ring: 0 0 0 4px color-mix(in oklab, var(--highlight), white 25%);
+  --shadow-elev: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --radius: 14px;
+
+  /* Typography & scale inspired by Sajid's tokens */
+  --ff: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans";
+  --ff2: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+  --h1: 700 2rem/1.2em var(--ff);
+  --p: 400 1rem/1.5em var(--ff);
+  --p-code: 300 0.8rem/1.8em var(--ff2);
+  --small: 400 0.85rem/1.6em var(--ff);
+
+  /* Hue-inspired mappings to our palette */
+  --primary-color: var(--color-bg);
+  --pre-primary-color: color-mix(in oklab, var(--color-bg), white 8%);
+  --secondary-color: var(--color-text);
+  --tertiary-color: var(--highlight);
+  --accent-color: var(--color-primary);
+}
+
+/* Base */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font: var(--p);
+  font-family: var(--ff);
+  background: radial-gradient(1200px 600px at 10% -10%, var(--bg-light) 0%, transparent 60%),
+              radial-gradient(1000px 500px at 110% 10%, var(--bg-dark) 0%, transparent 50%),
+              linear-gradient(135deg, var(--bg) 0%, var(--bg-dark) 100%);
+  color: var(--color-text);
+  padding: 24px;
+}
+
+a { font: 600 1rem/1em var(--ff); color: var(--accent-color); text-decoration: none; }
+h1 { font: var(--h1); margin: 0; }
+.small { font: var(--small); }
+
+/* Lobby container */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: var(--bg-dark);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-elev);
+  border: 1px solid var(--border-muted);
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+}
+
+.header {
+  background: linear-gradient(180deg, var(--bg-light), var(--bg));
+  color: var(--color-heading);
+  padding: 28px;
+  text-align: center;
+}
+.header h1 { font-weight: 700; letter-spacing: 0.2px; }
+.header p { color: var(--color-muted); margin-top: 6px; }
+.muted-text { color: var(--color-muted); }
+
+.content {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.section {
+  background: color-mix(in oklab, var(--bg), white 3%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-muted);
+}
+.section h2 {
+  color: var(--color-heading);
+  margin-bottom: 14px;
+  font-size: 1.1rem;
+}
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; margin-bottom: 6px; color: var(--color-muted); font-weight: 500; }
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--bg), white 5%);
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.form-group input::placeholder { color: var(--color-muted); }
+.form-group input:focus {
+  border-color: var(--highlight);
+  box-shadow: var(--ring);
+  background: color-mix(in oklab, var(--bg), white 8%);
+}
+
+.btn {
+  display: inline-block;
+  color: var(--primary-color);
+  background: var(--accent-color);
+  border-radius: 8px;
+  margin: 8px 8px 8px 0;
+  padding: 10px 18px;
+  border: 2px solid var(--accent-color);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.03); }
+.btn:active { transform: translateY(0); filter: brightness(0.98); }
+.btn:focus-visible { outline: none; box-shadow: var(--ring); }
+
+.btn-secondary { background: var(--primary-color); color: var(--accent-color); border: 2px solid var(--accent-color); }
+
+.lobby-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.lobby-list::-webkit-scrollbar { width: 8px; }
+.lobby-list::-webkit-scrollbar-thumb { background: var(--bg); border-radius: 8px; }
+
+.lobby-item {
+  padding: 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  background: color-mix(in oklab, var(--bg), white 4%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.12s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.lobby-item:hover { transform: translateY(-1px); border-color: var(--border); background: color-mix(in oklab, var(--bg), white 6%); }
+
+.lobby-info h3 { color: var(--color-heading); font-size: 1rem; margin-bottom: 4px; font-weight: 700; }
+.lobby-info p { color: var(--color-muted); font-size: 0.92rem; }
+
+.current-lobby {
+  background: hsl(160 100% 35% / 0.12);
+  border-color: hsl(160 100% 35% / 0.45);
+}
+
+.status { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; }
+.status.success { background: hsl(160 100% 35% / 0.15); color: #dcfce7; border: 1px solid hsl(160 100% 35% / 0.45); }
+.status.error { background: hsl(8 84% 66% / 0.15); color: #fee2e2; border: 1px solid hsl(8 84% 66% / 0.45); }
+
+@media (max-width: 768px) {
+  body { padding: 16px; }
+  .content { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+}
+
+/* Game UI */
+.game-container { display: flex; flex-direction: column; height: 100%; }
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-header-bg);
+  color: var(--color-header-text);
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+  backdrop-filter: blur(6px);
+}
+
+.game-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--color-bg);
+}
+.game-wrapper { margin: auto; position: relative; }
+.game-wrapper svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: var(--svg-bg);
+  border-radius: 0.75rem;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+}
+
+.game-footer {
+  padding: 0.6rem 1rem;
+  text-align: center;
+  background-color: var(--color-footer-bg);
+  color: var(--color-footer-text);
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+  backdrop-filter: blur(6px);
+}
+
+

@@ -364,29 +364,10 @@ fn close_lobby_effect(
 }
 
 fn view(model: AppModel) -> Element(AppMsg) {
-  let body = case model.state {
+  case model.state {
     InLobby -> view_lobby(model)
     InGame -> view_game(model)
   }
-  html.html([attribute.lang("en")], [
-    html.head([], [
-      html.meta([attribute.charset("utf-8")]),
-      html.meta([
-        attribute.name("viewport"),
-        attribute.content("width=device-width, initial-scale=1"),
-      ]),
-      html.title([], "Glurve Fever"),
-      html.link([
-        attribute.rel("stylesheet"),
-        attribute.href("/static/lobby.css"),
-      ]),
-      html.link([
-        attribute.rel("stylesheet"),
-        attribute.href("/static/game.css"),
-      ]),
-    ]),
-    html.body([], [body]),
-  ])
 }
 
 fn view_lobby(model: AppModel) -> Element(AppMsg) {
@@ -486,7 +467,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
               ])
             }
             None ->
-              html.p([attribute.style("color", "#718096")], [
+              html.p([attribute.class("muted-text")], [
                 html.text("Join a lobby to start playing!"),
               ])
           },
@@ -547,9 +528,18 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
           ),
         ]),
         html.main([attribute.class("game-canvas-wrapper")], [
-          server_component.element(
-            [server_component.route("/ws/" <> lobby_info.name)],
-            [],
+          html.div(
+            [
+              attribute.class("game-wrapper"),
+              attribute.style("width", "min(90vmin, 700px)"),
+              attribute.style("height", "min(90vmin, 700px)"),
+            ],
+            [
+              server_component.element(
+                [server_component.route("/ws/" <> lobby_info.name)],
+                [],
+              ),
+            ],
           ),
         ]),
         html.footer([attribute.class("game-footer")], [

@@ -62,6 +62,10 @@ fn serve_html(req: Request) -> Response {
           [attribute.type_("module"), attribute.src("/lustre/runtime.mjs")],
           "",
         ),
+        html.link([
+          attribute.rel("stylesheet"),
+          attribute.href("/static/app.css"),
+        ]),
       ]),
       html.body([], [
         server_component.element([server_component.route("/ws")], []),
