@@ -13,7 +13,7 @@ gleam test  # Run the tests
 ```
 
 ## Features needed
-- [ ] Join lobby when you create it
+- [x] Join lobby when you create it
 - [x] Add ability for game to communicate back to app when done, which closes the lobby and transitions players to lobby screen
 - [ ] Add style to game screen
 - [ ] Ability to unready yourself in a lobby
