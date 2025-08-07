@@ -56,6 +56,7 @@ pub type AppModel {
     current_lobby: Option(LobbyInfo),
     lobby_manager: Started(Subject(LobbyManagerMsg)),
     topic: Topic(AppSharedMsg(LobbyMsg)),
+    pending_created_lobby: Option(String),
   )
 }
 
@@ -87,6 +88,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       current_lobby: None,
       lobby_manager: args.lobby_manager,
       topic: args.topic,
+      pending_created_lobby: None,
     )
   #(model, subscribe(args.topic, RecievedAppSharedMsg))
 }
@@ -115,8 +117,18 @@ fn update_lobby_manager_shared_msg(
 ) -> #(AppModel, Effect(AppMsg)) {
   case msg {
     LobbyCreated(lobby_id, lobby) -> {
-      let lobbies = dict.insert(model.lobbies, lobby_id, lobby)
-      #(AppModel(..model, lobbies: lobbies), effect.none())
+      let updated_lobbies = dict.insert(model.lobbies, lobby_id, lobby)
+      case model.pending_created_lobby {
+        Some(pending) if pending == lobby_id -> #(
+          AppModel(
+            ..model,
+            lobbies: updated_lobbies,
+            pending_created_lobby: None,
+          ),
+          join_lobby_effect(model.player_id, lobby_id, updated_lobbies),
+        )
+        _ -> #(AppModel(..model, lobbies: updated_lobbies), effect.none())
+      }
     }
     LobbyRemoved(lobby_id) -> {
       let lobbies = dict.delete(model.lobbies, lobby_id)
@@ -216,7 +228,10 @@ fn update_lobby_manager_msg(
   let lobby_manager = model.lobby_manager
   case msg {
     CreateLobby(name, max_players) -> {
-      #(model, create_lobby_effect(lobby_manager, name, max_players))
+      #(
+        AppModel(..model, pending_created_lobby: Some(name)),
+        create_lobby_effect(lobby_manager, name, max_players),
+      )
     }
     RemoveLobby(lobby_id) -> {
       #(model, remove_lobby_effect(lobby_manager, lobby_id))
