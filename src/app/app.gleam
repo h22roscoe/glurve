@@ -155,7 +155,10 @@ fn update_lobby_shared_msg(
         }
         LobbyLeft(player_id) -> {
           case player_id == model.player_id {
-            True -> #(AppModel(..model, current_lobby: None), effect.none())
+            True -> #(
+              AppModel(..model, current_lobby: None, state: InLobby),
+              effect.none(),
+            )
 
             False -> {
               let lobby_info =
@@ -346,10 +349,29 @@ fn close_lobby_effect(
 }
 
 fn view(model: AppModel) -> Element(AppMsg) {
-  case model.state {
+  let body = case model.state {
     InLobby -> view_lobby(model)
     InGame -> view_game(model)
   }
+  html.html([attribute.lang("en")], [
+    html.head([], [
+      html.meta([attribute.charset("utf-8")]),
+      html.meta([
+        attribute.name("viewport"),
+        attribute.content("width=device-width, initial-scale=1"),
+      ]),
+      html.title([], "Glurve Fever"),
+      html.link([
+        attribute.rel("stylesheet"),
+        attribute.href("/static/lobby.css"),
+      ]),
+      html.link([
+        attribute.rel("stylesheet"),
+        attribute.href("/static/game.css"),
+      ]),
+    ]),
+    html.body([], [body]),
+  ])
 }
 
 fn view_lobby(model: AppModel) -> Element(AppMsg) {
@@ -406,6 +428,10 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
       html.link([
         attribute.rel("stylesheet"),
         attribute.href("/static/lobby.css"),
+      ]),
+      html.link([
+        attribute.rel("stylesheet"),
+        attribute.href("/static/game.css"),
       ]),
     ]),
     html.body([], [
@@ -516,10 +542,32 @@ fn view_lobby_name_input(
 fn view_game(model: AppModel) -> Element(AppMsg) {
   case model.current_lobby {
     Some(lobby_info) ->
-      server_component.element(
-        [server_component.route("/ws/" <> lobby_info.name)],
-        [],
-      )
-    None -> html.div([], [])
+      html.div([attribute.class("game-container")], [
+        html.header([attribute.class("game-header")], [
+          html.h1([], [html.text("🎮 Glurve Fever — " <> lobby_info.name)]),
+          html.button(
+            [
+              attribute.class("btn btn-exit"),
+              event.on_click(LobbyMsg(LeaveLobby(model.player_id))),
+            ],
+            [html.text("Exit to Lobby")],
+          ),
+        ]),
+        html.main([attribute.class("game-canvas-wrapper")], [
+          server_component.element(
+            [server_component.route("/ws/" <> lobby_info.name)],
+            [],
+          ),
+        ]),
+        html.footer([attribute.class("game-footer")], [
+          html.p([], [
+            html.text(
+              "Players: " <> int.to_string(set.size(lobby_info.players)),
+            ),
+          ]),
+        ]),
+      ])
+    None ->
+      html.div([attribute.class("game-empty")], [html.text("No game selected.")])
   }
 }

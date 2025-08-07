@@ -21,10 +21,7 @@ import lustre/event
 import lustre/server_component
 import player/player.{tail_radius}
 import prng/seed.{type Seed}
-import shared_messages.{
-  type AppSharedMsg, LobbyClosed, LobbyManagerSharedMsg, LobbyRemoved,
-  LobbySharedMsg,
-}
+import shared_messages.{type AppSharedMsg}
 
 const height = 500
 
@@ -139,17 +136,6 @@ fn countdown_effect() -> Effect(GameMsg) {
     Ok(timer) -> dispatch(NewCountdownTimer(timer))
     Error(_) -> Nil
   }
-}
-
-fn end_game_effect(
-  app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
-  lobby_id: String,
-) -> Effect(GameMsg) {
-  use _dispatch <- effect.from
-  let assert Ok(_) = glubsub.broadcast(app_topic, LobbySharedMsg(LobbyClosed))
-  let assert Ok(_) =
-    glubsub.broadcast(app_topic, LobbyManagerSharedMsg(LobbyRemoved(lobby_id)))
-  Nil
 }
 
 fn cancel_timer(timer: Option(time.TimerID)) -> Effect(GameMsg) {
@@ -336,7 +322,7 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
     KeyUp(_) -> #(model, effect.none())
 
     EndGame -> {
-      #(model, end_game_effect(model.app_topic, model.lobby_id))
+      #(model, effect.none())
     }
 
     NoOp -> #(model, effect.none())
@@ -392,21 +378,6 @@ fn view(model: Model) -> Element(GameMsg) {
       "You Win!",
     )
 
-  let click_to_return_text_element =
-    svg.text(
-      [
-        attribute.attribute("x", "50%"),
-        attribute.attribute("y", "60%"),
-        attribute.attribute("text-anchor", "middle"),
-        attribute.attribute("dominant-baseline", "middle"),
-        attribute.attribute("font-size", "14"),
-        attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "gray"),
-        event.on_click(EndGame),
-      ],
-      "Click anywhere to return to lobby",
-    )
-
   let overlay_elements = case model.game_state {
     Countdown(count) -> {
       draw_countdown(count)
@@ -420,20 +391,11 @@ fn view(model: Model) -> Element(GameMsg) {
       case winner {
         Ok(winner) -> {
           case winner.id == model.player_id {
-            True -> [
-              #("winner", winner_text_element),
-              #("click_to_return", click_to_return_text_element),
-            ]
-            False -> [
-              #("game_over", game_over_text_element),
-              #("click_to_return", click_to_return_text_element),
-            ]
+            True -> [#("winner", winner_text_element)]
+            False -> [#("game_over", game_over_text_element)]
           }
         }
-        Error(_) -> [
-          #("game_over", game_over_text_element),
-          #("click_to_return", click_to_return_text_element),
-        ]
+        Error(_) -> [#("game_over", game_over_text_element)]
       }
     }
     _ -> []
