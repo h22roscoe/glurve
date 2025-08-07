@@ -410,6 +410,7 @@ fn view(model: Model) -> Element(GameMsg) {
   let svg_attributes = [
     attribute.attribute("width", int.to_string(width)),
     attribute.attribute("height", int.to_string(height)),
+    attribute.autofocus(True),
     attribute.tabindex(0),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
