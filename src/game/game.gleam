@@ -14,7 +14,6 @@ import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
-import lustre/element/html
 import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
@@ -22,10 +21,6 @@ import lustre/server_component
 import player/player.{tail_radius}
 import prng/seed.{type Seed}
 import shared_messages.{type AppSharedMsg}
-
-const height = 500
-
-const width = 500
 
 const head_size = 10.0
 
@@ -69,6 +64,8 @@ pub type Model {
     timer: Option(time.TimerID),
     countdown_timer: Option(time.TimerID),
     seed: Seed,
+    board_width: Int,
+    board_height: Int,
   )
 }
 
@@ -98,7 +95,22 @@ fn subscribe(
   selector
 }
 
+fn compute_board_size(num_players: Int) -> Int {
+  let base = 480
+  let per_player = 40
+  let extra = int.max(0, num_players - 2) * per_player
+  let size = base + extra
+  // Clamp to a sensible range
+  case size {
+    _ if size < 480 -> 480
+    _ if size > 900 -> 900
+    _ -> size
+  }
+}
+
 fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
+  let num_players = dict.size(start_args.players)
+  let board = compute_board_size(num_players)
   let model =
     Model(
       lobby_id: start_args.lobby_id,
@@ -110,6 +122,8 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
       timer: None,
       countdown_timer: None,
       seed: start_args.seed,
+      board_width: board,
+      board_height: board,
     )
 
   #(
@@ -244,13 +258,17 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
     Tick -> {
       let new_players =
         dict.map_values(model.players, fn(_, p) {
-          player.update(p, height, width)
+          player.update(p, model.board_height, model.board_width)
         })
       let assert Ok(this_player) = dict.get(new_players, model.player_id)
       let player_collided_with_self =
         player.check_collision_with_self(this_player)
       let player_collided_with_edges =
-        player.check_collision_with_edges(this_player, height, width)
+        player.check_collision_with_edges(
+          this_player,
+          model.board_height,
+          model.board_width,
+        )
       let players_collided_with_other_players =
         player.check_collision_with_other_players(this_player, new_players)
       let player_collided =
@@ -354,12 +372,12 @@ fn view(model: Model) -> Element(GameMsg) {
     svg.text(
       [
         attribute.attribute("x", "50%"),
-        attribute.attribute("y", "45%"),
+        attribute.attribute("y", "50%"),
         attribute.attribute("text-anchor", "middle"),
         attribute.attribute("dominant-baseline", "middle"),
         attribute.attribute("font-size", "24"),
         attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "black"),
+        attribute.attribute("fill", "#f3b2ef"),
       ],
       "Game Over",
     )
@@ -373,7 +391,7 @@ fn view(model: Model) -> Element(GameMsg) {
         attribute.attribute("dominant-baseline", "middle"),
         attribute.attribute("font-size", "24"),
         attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", "black"),
+        attribute.attribute("fill", "#f3b2ef"),
       ],
       "You Win!",
     )
@@ -408,28 +426,30 @@ fn view(model: Model) -> Element(GameMsg) {
   }
 
   let svg_attributes = [
-    attribute.attribute("width", int.to_string(width)),
-    attribute.attribute("height", int.to_string(height)),
-    attribute.autofocus(True),
+    attribute.attribute(
+      "viewBox",
+      "0 0 "
+        <> int.to_string(model.board_width)
+        <> " "
+        <> int.to_string(model.board_height),
+    ),
+    // Ensure the SVG can receive focus for keyboard controls
     attribute.tabindex(0),
+    attribute.autofocus(True),
+    attribute.attribute("width", "100%"),
+    attribute.attribute("height", "100%"),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
   ]
 
-  element.fragment([html.style([], { "
-      svg {
-        background-color: oklch(98.4% 0.003 247.858);
-        top: 5;
-        left: 5;
-        width: " <> int.to_string(width) <> "px;
-        height: " <> int.to_string(height) <> "px;
-      }
-      " }), keyed.namespaced(
+  element.fragment([
+    keyed.namespaced(
       "http://www.w3.org/2000/svg",
       "svg",
       svg_attributes,
       svg_children,
-    )])
+    ),
+  ])
 }
 
 /// Draws the player by creating a list of SVG elements that represent
@@ -505,7 +525,7 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
 }
 
 pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {
-  let countdown_colour = case colour.from_hsla(1.0, 1.0, 0.0, 0.15) {
+  let countdown_colour = case colour.from_hsla(0.824, 0.73, 0.83, 0.15) {
     Ok(c) -> c
     Error(_) -> colour.black
   }

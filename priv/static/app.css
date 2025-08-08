@@ -5,12 +5,12 @@
   --bg-dark: hsl(223, 49%, 8%);     /* ~#0b1020 */
   --bg: hsl(223, 45%, 10%);
   --bg-light: hsl(223, 40%, 15%);
-  --text: hsl(220, 14%, 92%);
+  --text: hsl(304, 28%, 65%);
   --text-muted: hsl(220, 12%, 70%);
-  --highlight: hsl(258, 90%, 77%);  /* violet accent */
+  --highlight: hsl(304, 73%, 83%);  /* violet accent */
   --border: hsl(222, 36%, 26%);
   --border-muted: hsl(222, 26%, 18%);
-  --primary: hsl(258, 90%, 77%);    /* primary accent */
+  --primary: hsl(304, 73%, 83%);    /* primary accent */
   --secondary: hsl(50, 100%, 60%);  /* yellow */
   --danger: hsl(0, 84%, 63%);       /* red */
   --warning: hsl(38, 92%, 50%);     /* amber */
@@ -224,9 +224,7 @@ h1 { font: var(--h1); margin: 0; }
   display: block;
   width: 100%;
   height: 100%;
-  background-color: var(--svg-bg);
-  border-radius: 0.75rem;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+  outline: none; /* prevent default focus ring on SVG */
 }
 
 .game-footer {

@@ -377,9 +377,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
   let num_lobbies = dict.size(lobbies)
   let lobbies_list = case num_lobbies {
     0 ->
-      html.p([attribute.style("color", "#718096")], [
-        html.text("Loading lobbies..."),
-      ])
+      html.p([attribute.class("muted-text")], [html.text("Loading lobbies...")])
     _ ->
       html.div(
         [attribute.id("lobbies-list"), attribute.class("lobby-list")],
@@ -475,9 +473,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
       ]),
       html.div([attribute.class("section")], [
         html.h2([], [html.text("Available Lobbies")]),
-        html.div([attribute.id("lobbies-list"), attribute.class("lobby-list")], [
-          lobbies_list,
-        ]),
+        lobbies_list,
       ]),
     ]),
     html.div([attribute.id("status"), attribute.class("status")], []),
@@ -531,8 +527,9 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
           html.div(
             [
               attribute.class("game-wrapper"),
-              attribute.style("width", "min(90vmin, 700px)"),
-              attribute.style("height", "min(90vmin, 700px)"),
+              // Scales with viewport, capped for large screens
+              attribute.style("width", "min(80vmin, 820px)"),
+              attribute.style("height", "min(80vmin, 820px)"),
             ],
             [
               server_component.element(
