@@ -438,6 +438,7 @@ fn view(model: Model) -> Element(GameMsg) {
     attribute.autofocus(True),
     attribute.attribute("width", "100%"),
     attribute.attribute("height", "100%"),
+    attribute.style("outline", "none!important"),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
   ]
