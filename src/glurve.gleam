@@ -1,4 +1,5 @@
 import app/app_socket
+import envoy
 import game/game_socket
 import gleam/dict
 import gleam/erlang/process.{type Subject}
@@ -7,6 +8,7 @@ import gleam/http/response
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/otp/actor.{type Started}
+import gleam/result
 import gleam/set
 import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
@@ -35,7 +37,10 @@ pub fn main() {
   let assert Ok(topic) = glubsub.new_topic()
   let lobby_manager = lobby_manager.start(topic)
 
-  let secret_key_base = "glurve"
+  let secret_key_base =
+    envoy.get("SECRET_KEY_BASE")
+    |> result.lazy_unwrap(fn() { wisp.random_string(64) })
+
   let seed = seed.random()
 
   let wisp_handler =
