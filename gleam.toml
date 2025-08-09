@@ -33,4 +33,4 @@ envoy = ">= 1.0.2 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
-radiate = { git = "https://github.com/h22roscoe/gleam-radiate.git", ref = "ad9a82029807e569881c5201386b9107fa570d80" }
+radiate = { git = "https://github.com/h22roscoe/gleam-radiate.git", ref = "735d957c76af6a654334432fe94fff6fcb748f91" }
