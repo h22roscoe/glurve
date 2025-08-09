@@ -61,7 +61,7 @@ pub fn main() {
   let assert Ok(_) =
     overall_handler
     |> mist.new
-    |> mist.bind("localhost")
+    |> mist.bind("0.0.0.0")
     |> mist.port(1234)
     |> mist.start
 
