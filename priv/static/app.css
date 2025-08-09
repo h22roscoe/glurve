@@ -9,24 +9,10 @@
   font-family: "Outfit";
   font-display: swap;
   src: url("https://gleam.run/fonts/Outfit.woff") format("woff");
-@font-face {
-  font-family: "Lexend";
-  font-display: swap;
-  font-weight: 400;
-  src: url("https://gleam.run/fonts/Lexend.woff2") format("woff2");
 }
 
-@font-face {
-  font-family: "Outfit";
-  font-display: swap;
-  src: url("https://gleam.run/fonts/Outfit.woff") format("woff");
-}
-
-html,
 html,
 body {
-  min-height: 100%;
-  padding: 0;
   min-height: 100%;
   padding: 0;
   margin: 0;
@@ -96,113 +82,6 @@ body.theme-dark {
   height: 3rem;
 }
 
-body {
-  /* Variables */
-  --primary-font: "Lexend", -apple-system, BlinkMacSystemFont, avenir next,
-    avenir, segoe ui, helvetica neue, helvetica, Cantarell, Ubuntu, roboto,
-    noto, arial, sans-serif;
-  --page-background: #fffefb;
-  --card-border: #e7e5e1;
-  --card-border-highlight: #d9d6d0;
-  --text-regular: #81747c;
-  --text-highlight: #151515;
-  --faff-pink: #ffaff3;
-  --font-regular: 400;
-  --font-medium: 500;
-  --font-bold: 600;
-  --corner-radius: 0.4rem;
-  --spacing: 1rem;
-  /* Styles */
-  background: var(--page-background);
-  font-family: var(--primary-font);
-  color: var(--text-regular);
-  color-scheme: light;
-}
-
-body.theme-dark {
-  --page-background: #292d3e;
-  --card-background: #3e4356;
-  --card-border: #474b60;
-  --card-border-highlight: #616683;
-  --text-regular: #d9dff8;
-  --text-highlight: #ffffff;
-  color-scheme: dark;
-}
-
-.page-nav {
-  height: 4rem;
-  background: var(--faff-pink);
-  color: #000;
-}
-
-.page-nav,
-.page-nav a {
-  color: #000;
-  text-decoration: none;
-}
-
-.page-nav .container {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.page-nav .nav-brand {
-  display: flex;
-  font-size: 1.2rem;
-  gap: 0.2rem;
-  height: 4rem;
-  align-items: center;
-}
-
-.page-nav .nav-brand img {
-  height: 3rem;
-}
-
-.page-nav .darkmode-toggle {
-  padding: 1rem;
-  appearance: none;
-  border: none;
-  background: none;
-  width: 2rem;
-  height: 2rem;
-  transition: opacity 120ms ease-in-out;
-  opacity: 1;
-  position: relative;
-  box-sizing: border-box;
-}
-
-.page-nav .darkmode-toggle:hover {
-  opacity: 0.7;
-  cursor: pointer;
-}
-
-.page-nav .toggle-icon {
-  width: 2rem;
-  height: 2rem;
-  position: absolute;
-  top: 0;
-  right: 0;
-  opacity: 1;
-  transition: all 120ms ease;
-  transform: translateY(0);
-}
-
-body.theme-light .page-nav .toggle-light,
-body.theme-dark .page-nav .toggle-dark {
-  opacity: 0;
-  transform: translateY(-1rem);
-  pointer-events: none;
-}
-
-.page-header {
-  padding: 2rem 0 1.5rem;
-  font-size: 1.6rem;
-  font-weight: var(--font-bold);
-  color: var(--text-highlight);
-}
-
 .page-nav .darkmode-toggle {
   padding: 1rem;
   appearance: none;
@@ -248,9 +127,7 @@ body.theme-dark .page-nav .toggle-dark {
 
 .container {
   max-width: 992px;
-  max-width: 992px;
   margin: 0 auto;
-  padding: 0 1.2rem;
   padding: 0 1.2rem;
 }
 
@@ -258,16 +135,7 @@ body.theme-dark .page-nav .toggle-dark {
   display: grid;
   gap: 1rem;
   padding: 1.2rem 0 1.4rem;
-  display: grid;
-  gap: 1rem;
-  padding: 1.2rem 0 1.4rem;
 }
-
-.lobby-form input {
-  box-sizing: border-box;
-  background: none;
-  border: none;
-  appearance: none;
 
 .lobby-form input {
   box-sizing: border-box;
@@ -275,13 +143,6 @@ body.theme-dark .page-nav .toggle-dark {
   border: none;
   appearance: none;
   width: 100%;
-  padding: 1rem 2rem 1rem 3rem;
-  font-size: 1rem;
-  font-weight: var(--font-medium);
-  color: var(--text-highlight);
-}
-
-.lobby-form input:focus {
   padding: 1rem 2rem 1rem 3rem;
   font-size: 1rem;
   font-weight: var(--font-medium);
@@ -384,56 +245,4 @@ body.theme-dark .page-nav .toggle-dark {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-}
-
-.lobby-item .lobby-button {
-  border: var(--card-border) 1px solid;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.9rem;
-  font-family: var(--primary-font);
-  border-radius: var(--corner-radius);
-  text-decoration: none;
-  color: var(--text-highlight);
-  transition: border-color 120ms ease-in-out;
-  background: none;
-}
-
-.lobby-item .lobby-button:hover {
-  border-color: var(--card-border-highlight);
-}
-
-.lobby-item .lobby-button svg {
-  width: 1.2rem;
-  height: 1.2rem;
-}
-
-.lobby-item aside {
-  font-size: 0.8rem;
-}
-
-.lobby-item .lobby-current-status {
-  margin: 0;
-  padding-top: 0.4rem;
-}
-
-.lobby-item .lobby-current-status span {
-  color: var(--text-highlight);
-}
-
-.lobby-item:not(:last-child) {
-  border-bottom: var(--card-border) 1px solid;
-}
-
-@media screen and (min-width: 768px) {
-  .lobby-item {
-    grid-template-columns: 1fr minmax(auto, calc(12 * var(--spacing)));
-  }
-
-  .lobby-item aside {
-    text-align: right;
-    font-size: 1rem;
-  }
 }
