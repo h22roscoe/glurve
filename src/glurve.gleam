@@ -27,10 +27,17 @@ import wisp/wisp_mist
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
-  let _ =
-    radiate.new()
-    |> radiate.add_dir(".")
-    |> radiate.start()
+  let env = envoy.get("ENV")
+  case env {
+    Ok("PROD") -> Nil
+    _ -> {
+      let _ =
+        radiate.new()
+        |> radiate.add_dir(".")
+        |> radiate.start()
+      Nil
+    }
+  }
 
   wisp.configure_logger()
 

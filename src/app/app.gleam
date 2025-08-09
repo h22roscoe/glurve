@@ -377,7 +377,9 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
   let num_lobbies = dict.size(lobbies)
   let lobbies_list = case num_lobbies {
     0 ->
-      html.p([attribute.class("muted-text")], [html.text("Loading lobbies...")])
+      html.p([attribute.class("muted-text")], [
+        html.text("No lobbies created yet!"),
+      ])
     _ ->
       html.div(
         [attribute.id("lobbies-list"), attribute.class("lobby-list")],
@@ -385,9 +387,9 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
           use lobby_id, lobby <- dict.map_values(lobbies)
           let lobby_state = lobby.get_lobby_info(lobby.data)
           html.div([attribute.class("lobby-item")], [
-            html.div([attribute.class("lobby-info")], [
-              html.h3([], [html.text(lobby_id)]),
-              html.p([], [
+            html.main([], [
+              html.h3([attribute.class("lobby-name")], [html.text(lobby_id)]),
+              html.p([attribute.class("lobby-description")], [
                 html.text(
                   "Players: "
                   <> int.to_string(set.size(lobby_state.players))
@@ -397,14 +399,19 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
                   <> lobby.status_to_string(lobby_state.status),
                 ),
               ]),
+              html.nav([attribute.class("lobby-buttons")], [
+                html.button(
+                  [
+                    attribute.class("lobby-button"),
+                    event.on_click(
+                      LobbyMsg(JoinLobby(model.player_id, lobby_id)),
+                    ),
+                  ],
+                  [html.text("Join")],
+                ),
+              ]),
             ]),
-            html.button(
-              [
-                attribute.class("btn"),
-                event.on_click(LobbyMsg(JoinLobby(model.player_id, lobby_id))),
-              ],
-              [html.text("Join")],
-            ),
+            html.aside([], []),
           ])
         }
           |> dict.to_list
@@ -412,71 +419,72 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
       )
   }
 
-  html.div([attribute.class("container")], [
-    html.div([attribute.class("header")], [
-      html.h1([], [html.text("🎮 Glurve Fever")]),
-      html.p([], [html.text("Create a lobby or join an existing one")]),
-    ]),
-    html.div([attribute.class("content")], [
-      html.div([attribute.class("section")], [
-        html.h2([], [html.text("Create New Lobby")]),
-        html.div([attribute.class("form-group")], [
-          html.label([attribute.for("lobby-name")], [html.text("Lobby Name")]),
-          view_lobby_name_input(create_lobby),
+  html.div([], [
+    html.div([attribute.class("container")], [
+      html.header([attribute.class("page-header")], [
+        html.h1([], [html.text("Lobby area")]),
+      ]),
+      html.div([attribute.class("content")], [
+        html.div([attribute.class("section")], [
+          html.h2([], [html.text("Create New Lobby")]),
+          html.div([attribute.class("lobby-form")], [
+            html.label([attribute.for("lobby-name")], [html.text("Lobby Name")]),
+            view_lobby_name_input(create_lobby),
+          ]),
+        ]),
+        html.div([attribute.class("section")], [
+          html.h2([], [html.text("Current Lobby")]),
+          html.div([attribute.id("current-lobby-info")], [
+            case current_lobby {
+              Some(lobby_info) -> {
+                html.div([attribute.class("lobby-item current-lobby")], [
+                  html.div([attribute.class("lobby-info")], [
+                    html.h3([], [
+                      html.text("🎯 Current Lobby: " <> lobby_info.name),
+                    ]),
+                    html.p([], [
+                      html.text(
+                        "Ready players: "
+                        <> int.to_string(set.size(lobby_info.ready_players))
+                        <> "/"
+                        <> int.to_string(set.size(lobby_info.players))
+                        <> " • Status: "
+                        <> lobby.status_to_string(lobby_info.status),
+                      ),
+                    ]),
+                  ]),
+                  html.button(
+                    [
+                      attribute.class("btn"),
+                      event.on_click(LobbyMsg(PlayerReady(player_id))),
+                    ],
+                    [html.text("Ready")],
+                  ),
+                  html.button(
+                    [
+                      attribute.id("leave-lobby"),
+                      attribute.class("btn btn-secondary"),
+                      attribute.style("margin-left", "10px"),
+                      event.on_click(LobbyMsg(LeaveLobby(player_id))),
+                    ],
+                    [html.text("Leave")],
+                  ),
+                ])
+              }
+              None ->
+                html.p([attribute.class("muted-text")], [
+                  html.text("Join a lobby to start playing!"),
+                ])
+            },
+          ]),
+        ]),
+        html.div([attribute.class("section")], [
+          html.h2([], [html.text("Available Lobbies")]),
+          lobbies_list,
         ]),
       ]),
-      html.div([attribute.class("section")], [
-        html.h2([], [html.text("Current Lobby")]),
-        html.div([attribute.id("current-lobby-info")], [
-          case current_lobby {
-            Some(lobby_info) -> {
-              html.div([attribute.class("lobby-item current-lobby")], [
-                html.div([attribute.class("lobby-info")], [
-                  html.h3([], [
-                    html.text("🎯 Current Lobby: " <> lobby_info.name),
-                  ]),
-                  html.p([], [
-                    html.text(
-                      "Ready players: "
-                      <> int.to_string(set.size(lobby_info.ready_players))
-                      <> "/"
-                      <> int.to_string(set.size(lobby_info.players))
-                      <> " • Status: "
-                      <> lobby.status_to_string(lobby_info.status),
-                    ),
-                  ]),
-                ]),
-                html.button(
-                  [
-                    attribute.class("btn"),
-                    event.on_click(LobbyMsg(PlayerReady(player_id))),
-                  ],
-                  [html.text("Ready")],
-                ),
-                html.button(
-                  [
-                    attribute.id("leave-lobby"),
-                    attribute.class("btn btn-secondary"),
-                    attribute.style("margin-left", "10px"),
-                    event.on_click(LobbyMsg(LeaveLobby(player_id))),
-                  ],
-                  [html.text("Leave")],
-                ),
-              ])
-            }
-            None ->
-              html.p([attribute.class("muted-text")], [
-                html.text("Join a lobby to start playing!"),
-              ])
-          },
-        ]),
-      ]),
-      html.div([attribute.class("section")], [
-        html.h2([], [html.text("Available Lobbies")]),
-        lobbies_list,
-      ]),
+      html.div([attribute.id("status"), attribute.class("status")], []),
     ]),
-    html.div([attribute.id("status"), attribute.class("status")], []),
   ])
 }
 
