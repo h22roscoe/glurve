@@ -15,6 +15,7 @@ import mist
 import player/player.{Player, Straight}
 import position
 import prng/seed.{type Seed}
+import radiate
 import router
 import shared_messages.{type AppSharedMsg}
 import uuid_colour
@@ -24,6 +25,11 @@ import wisp/wisp_mist
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
+  let _ =
+    radiate.new()
+    |> radiate.add_dir(".")
+    |> radiate.start()
+
   wisp.configure_logger()
 
   let assert Ok(topic) = glubsub.new_topic()
