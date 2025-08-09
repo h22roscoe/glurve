@@ -68,6 +68,30 @@ fn serve_html(req: Request) -> Response {
         ]),
       ]),
       html.body([], [
+        html.nav([attribute.class("page-nav")], [
+          html.div([attribute.class("container")], [
+            html.h1([], [html.text("🎮 Glurve Fever")]),
+            html.button(
+              [
+                attribute.data("theme-toggle", "light"),
+                attribute.class("darkmode-toggle"),
+              ],
+              [
+                html.script([attribute.src("/static/theme-switcher.js")], ""),
+                html.img([
+                  attribute.src("/static/mode-switch-dark.svg"),
+                  attribute.alt("Dark mode switch icon"),
+                  attribute.class("toggle-icon toggle-dark"),
+                ]),
+                html.img([
+                  attribute.src("/static/mode-switch-light.svg"),
+                  attribute.alt("Light mode switch icon"),
+                  attribute.class("toggle-icon toggle-light"),
+                ]),
+              ],
+            ),
+          ]),
+        ]),
         server_component.element([server_component.route("/ws")], []),
       ]),
     ])
