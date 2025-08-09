@@ -20,6 +20,7 @@ import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
+import lustre/element/svg
 import lustre/event
 import lustre/server_component
 import shared_messages.{
@@ -394,9 +395,7 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
                   "Players: "
                   <> int.to_string(set.size(lobby_state.players))
                   <> "/"
-                  <> int.to_string(lobby_state.max_players)
-                  <> " • Status: "
-                  <> lobby.status_to_string(lobby_state.status),
+                  <> int.to_string(lobby_state.max_players),
                 ),
               ]),
               html.nav([attribute.class("lobby-buttons")], [
@@ -407,11 +406,35 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
                       LobbyMsg(JoinLobby(model.player_id, lobby_id)),
                     ),
                   ],
-                  [html.text("Join")],
+                  [
+                    svg.svg(
+                      [
+                        attribute.class("lobby-button-icon"),
+                        attribute.attribute("viewBox", "0 0 640 512"),
+                        attribute.attribute("fill", "#ffaff3"),
+                      ],
+                      [
+                        svg.path([
+                          attribute.attribute(
+                            "d",
+                            "M136 128a120 120 0 1 1 240 0 120 120 0 1 1 -240 0zM48 482.3C48 383.8 127.8 304 226.3 304l59.4 0c98.5 0 178.3 79.8 178.3 178.3 0 16.4-13.3 29.7-29.7 29.7L77.7 512C61.3 512 48 498.7 48 482.3zM544 96c13.3 0 24 10.7 24 24l0 48 48 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-48 0 0 48c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-48-48 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0 0-48c0-13.3 10.7-24 24-24z",
+                          ),
+                        ]),
+                      ],
+                    ),
+                    html.text("Join"),
+                  ],
                 ),
               ]),
             ]),
-            html.aside([], []),
+            html.aside([], [
+              html.p([attribute.class("lobby-current-status")], [
+                html.text("Status: "),
+                html.span([], [
+                  html.text(lobby.status_to_string(lobby_state.status)),
+                ]),
+              ]),
+            ]),
           ])
         }
           |> dict.to_list

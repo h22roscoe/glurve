@@ -194,6 +194,7 @@ body.theme-dark .page-nav .toggle-dark {
   gap: 0.4rem;
   padding: 0.3rem 0.7rem;
   font-size: 0.9rem;
+  font-family: var(--primary-font);
   border-radius: var(--corner-radius);
   text-decoration: none;
   color: var(--text-highlight);
@@ -205,7 +206,7 @@ body.theme-dark .page-nav .toggle-dark {
   border-color: var(--card-border-highlight);
 }
 
-.lobby-item .lobby-button img {
+.lobby-item .lobby-button svg {
   width: 1.2rem;
   height: 1.2rem;
 }
@@ -214,12 +215,12 @@ body.theme-dark .page-nav .toggle-dark {
   font-size: 0.8rem;
 }
 
-.lobby-item .lobby-update-time {
+.lobby-item .lobby-current-status {
   margin: 0;
   padding-top: 0.4rem;
 }
 
-.lobby-item .lobby-update-time span {
+.lobby-item .lobby-current-status span {
   color: var(--text-highlight);
 }
 
@@ -227,7 +228,7 @@ body.theme-dark .page-nav .toggle-dark {
   border-bottom: var(--card-border) 1px solid;
 }
 
-@media screen and (min-width: 992px) {
+@media screen and (min-width: 768px) {
   .lobby-item {
     grid-template-columns: 1fr minmax(auto, calc(12 * var(--spacing)));
   }
