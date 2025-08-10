@@ -142,6 +142,10 @@ body.theme-dark .page-nav .toggle-dark {
   color: var(--text-highlight);
   transition: border-color 120ms ease-in-out;
 }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .btn:active {
   transform: translateY(1px);
   scale: 0.99;

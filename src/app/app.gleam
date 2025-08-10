@@ -296,18 +296,21 @@ fn update_lobby_manager_msg(
   let lobby_manager = model.lobby_manager
   case msg {
     CreateLobby(name, host_id, max_players, map, mode, region) -> {
-      #(
-        AppModel(..model, pending_created_lobby: Some(name)),
-        create_lobby_effect(
-          lobby_manager,
-          name,
-          host_id,
-          max_players,
-          map,
-          mode,
-          region,
-        ),
-      )
+      case name == "" {
+        True -> #(model, effect.none())
+        False -> #(
+          AppModel(..model, pending_created_lobby: Some(name)),
+          create_lobby_effect(
+            lobby_manager,
+            name,
+            host_id,
+            max_players,
+            map,
+            mode,
+            region,
+          ),
+        )
+      }
     }
     RemoveLobby(lobby_id) -> {
       #(model, remove_lobby_effect(lobby_manager, lobby_id))
@@ -756,16 +759,26 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
           html.button(
             [
               attribute.class("btn"),
-              event.on_click(
-                LobbyManagerMsg(CreateLobby(
-                  model.lobby_name_input |> option.unwrap(""),
-                  model.player.id,
-                  model.lobby_max_players_input |> option.unwrap(4),
-                  model.lobby_map_input |> option.unwrap(""),
-                  model.lobby_mode_input |> option.unwrap(""),
-                  model.lobby_region_input |> option.unwrap(""),
-                )),
-              ),
+              case model.lobby_name_input {
+                Some(name) if name != "" -> attribute.disabled(False)
+                Some(_) -> attribute.disabled(True)
+                None -> attribute.disabled(True)
+              },
+              case model.lobby_name_input {
+                Some(name) if name != "" ->
+                  event.on_click(
+                    LobbyManagerMsg(CreateLobby(
+                      name,
+                      model.player.id,
+                      model.lobby_max_players_input |> option.unwrap(4),
+                      model.lobby_map_input |> option.unwrap(""),
+                      model.lobby_mode_input |> option.unwrap(""),
+                      model.lobby_region_input |> option.unwrap(""),
+                    )),
+                  )
+                Some(_) -> attribute.none()
+                None -> attribute.none()
+              },
             ],
             [html.text("Create Room")],
           ),
