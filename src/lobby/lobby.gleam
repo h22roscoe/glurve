@@ -1,41 +1,32 @@
 import game/game_shared_message.{type GameSharedMsg}
 import gleam/erlang/process.{type Subject}
+import gleam/list
 import gleam/otp/actor.{type Started}
 import gleam/set.{type Set}
+import gleam_community/colour
 import glubsub.{type Topic}
+import gluid
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
   LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
 }
 
-pub fn start(
-  name: String,
-  max_players: Int,
-  topic: Topic(AppSharedMsg(LobbyMsg)),
-) -> Started(Subject(LobbyMsg)) {
-  let assert Ok(game_topic) = glubsub.new_topic()
-  let state =
-    LobbyInfo(
-      name,
-      set.new(),
-      set.new(),
-      max_players,
-      Waiting,
-      topic,
-      game_topic,
-    )
-  let assert Ok(actor) =
-    actor.new(state)
-    |> actor.on_message(handle_lobby_msg)
-    |> actor.start()
-  actor
+pub type Player {
+  Player(id: String, name: String, colour: colour.Colour, status: PlayerStatus)
+}
+
+pub type PlayerStatus {
+  Ready
+  NotReady
+  PickingColour
+  SettingName
 }
 
 pub type LobbyMsg {
-  JoinLobby(player_id: String, lobby_id: String)
-  LeaveLobby(player_id: String)
-  PlayerReady(player_id: String)
-  PlayerNotReady(player_id: String)
+  JoinLobby(player: Player, lobby_id: String)
+  LeaveLobby(player: Player)
+  PlayerReady(player: Player)
+  PlayerNotReady(player: Player)
   GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
   GetLobbyInfo(reply_with: Subject(LobbyInfo))
   CloseLobby
@@ -43,11 +34,15 @@ pub type LobbyMsg {
 
 pub type LobbyInfo {
   LobbyInfo(
+    code: String,
     name: String,
-    players: Set(String),
-    ready_players: Set(String),
+    players: Set(Player),
     max_players: Int,
     status: LobbyStatus,
+    host_id: String,
+    map: String,
+    mode: String,
+    region: String,
     topic: Topic(AppSharedMsg(LobbyMsg)),
     game_topic: Topic(GameSharedMsg),
   )
@@ -59,6 +54,37 @@ pub type LobbyStatus {
   Playing
 }
 
+pub fn start(
+  name: String,
+  host_id: String,
+  max_players: Int,
+  map: String,
+  mode: String,
+  region: String,
+  topic: Topic(AppSharedMsg(LobbyMsg)),
+) -> Started(Subject(LobbyMsg)) {
+  let assert Ok(game_topic) = glubsub.new_topic()
+  let state =
+    LobbyInfo(
+      room_code(),
+      name,
+      set.new(),
+      max_players,
+      Waiting,
+      host_id,
+      map,
+      mode,
+      region,
+      topic,
+      game_topic,
+    )
+  let assert Ok(actor) =
+    actor.new(state)
+    |> actor.on_message(handle_lobby_msg)
+    |> actor.start()
+  actor
+}
+
 pub fn status_to_string(status: LobbyStatus) -> String {
   case status {
     Waiting -> "Waiting"
@@ -67,21 +93,30 @@ pub fn status_to_string(status: LobbyStatus) -> String {
   }
 }
 
+pub fn player_status_to_string(status: PlayerStatus) -> String {
+  case status {
+    Ready -> "Ready"
+    NotReady -> "Not Ready"
+    PickingColour -> "Picking Colour"
+    SettingName -> "Setting Name"
+  }
+}
+
 fn handle_lobby_msg(
   state: LobbyInfo,
   msg: LobbyMsg,
 ) -> actor.Next(LobbyInfo, LobbyMsg) {
   case msg {
-    JoinLobby(player_id, lobby_id) if lobby_id == state.name -> {
+    JoinLobby(player, lobby_id) if lobby_id == state.name -> {
       case state.status {
         Waiting -> {
           let new_info =
-            LobbyInfo(..state, players: set.insert(state.players, player_id))
+            LobbyInfo(..state, players: set.insert(state.players, player))
           let num_players = set.size(new_info.players)
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(LobbyJoined(player_id, state.name)),
+              LobbySharedMsg(LobbyJoined(player.id, state.name)),
             )
           case num_players {
             _ if num_players >= state.max_players -> {
@@ -96,61 +131,72 @@ fn handle_lobby_msg(
     JoinLobby(_, _) -> {
       actor.continue(state)
     }
-    LeaveLobby(player_id) -> {
-      let new_players = set.delete(state.players, player_id)
-      let new_ready_players = set.delete(state.ready_players, player_id)
+    LeaveLobby(player) -> {
+      let is_host = player.id == state.host_id
+      let new_players = set.delete(state.players, player)
       let new_status = case set.size(new_players) < state.max_players {
         True -> Waiting
         False -> state.status
       }
       let new_info =
-        LobbyInfo(
-          ..state,
-          players: new_players,
-          ready_players: new_ready_players,
-          status: new_status,
-        )
-      let assert Ok(_) =
-        glubsub.broadcast(state.topic, LobbySharedMsg(LobbyLeft(player_id)))
-      actor.continue(new_info)
+        LobbyInfo(..state, players: new_players, status: new_status)
+      case is_host {
+        True -> {
+          let assert Ok(_) =
+            glubsub.broadcast(state.topic, LobbySharedMsg(LobbyClosed))
+          actor.stop()
+        }
+        False -> {
+          let assert Ok(_) =
+            glubsub.broadcast(state.topic, LobbySharedMsg(LobbyLeft(player.id)))
+          actor.continue(new_info)
+        }
+      }
     }
-    PlayerReady(player_id) -> {
-      let total_players = set.size(state.players)
-      let new_ready_players = set.insert(state.ready_players, player_id)
+    PlayerReady(player) -> {
+      let new_players =
+        set.map(state.players, fn(p) {
+          case p.id == player.id {
+            True -> Player(..p, status: Ready)
+            False -> p
+          }
+        })
 
-      let all_ready = set.size(new_ready_players) == total_players
+      let all_ready =
+        set.to_list(new_players)
+        |> list.all(fn(p) { p.status == Ready })
+
       case all_ready {
         True -> {
           let assert Ok(_) =
             glubsub.broadcast(state.topic, LobbySharedMsg(AllPlayersReady))
           let new_state =
-            LobbyInfo(
-              ..state,
-              status: Playing,
-              ready_players: new_ready_players,
-            )
+            LobbyInfo(..state, players: new_players, status: Playing)
           actor.continue(new_state)
         }
         False -> {
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(PlayerBecameReady(player_id)),
+              LobbySharedMsg(PlayerBecameReady(player.id)),
             )
-          actor.continue(LobbyInfo(..state, ready_players: new_ready_players))
+          actor.continue(LobbyInfo(..state, players: new_players))
         }
       }
     }
-    PlayerNotReady(player_id) -> {
-      let new_info =
-        LobbyInfo(
-          ..state,
-          ready_players: set.delete(state.ready_players, player_id),
-        )
+    PlayerNotReady(player) -> {
+      let new_players =
+        set.map(state.players, fn(p) {
+          case p.id == player.id {
+            True -> Player(..p, status: NotReady)
+            False -> p
+          }
+        })
+      let new_info = LobbyInfo(..state, players: new_players)
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
-          LobbySharedMsg(PlayerBecameNotReady(player_id)),
+          LobbySharedMsg(PlayerBecameNotReady(player.id)),
         )
       actor.continue(new_info)
     }
@@ -173,22 +219,22 @@ fn handle_lobby_msg(
 
 pub fn join_lobby(
   subject: Subject(LobbyMsg),
-  player_id: String,
+  player: Player,
   lobby_id: String,
 ) -> Nil {
-  actor.send(subject, JoinLobby(player_id, lobby_id))
+  actor.send(subject, JoinLobby(player, lobby_id))
 }
 
-pub fn leave_lobby(subject: Subject(LobbyMsg), player_id: String) -> Nil {
-  actor.send(subject, LeaveLobby(player_id))
+pub fn leave_lobby(subject: Subject(LobbyMsg), player: Player) -> Nil {
+  actor.send(subject, LeaveLobby(player))
 }
 
-pub fn player_ready(subject: Subject(LobbyMsg), player_id: String) -> Nil {
-  actor.send(subject, PlayerReady(player_id))
+pub fn player_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
+  actor.send(subject, PlayerReady(player))
 }
 
-pub fn player_not_ready(subject: Subject(LobbyMsg), player_id: String) -> Nil {
-  actor.send(subject, PlayerNotReady(player_id))
+pub fn player_not_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
+  actor.send(subject, PlayerNotReady(player))
 }
 
 pub fn get_game_topic(
@@ -203,4 +249,8 @@ pub fn get_lobby_info(subject: Subject(LobbyMsg)) -> LobbyInfo {
 
 pub fn close_lobby(subject: Subject(LobbyMsg)) -> Nil {
   actor.send(subject, CloseLobby)
+}
+
+fn room_code() -> String {
+  gluid.guidv4()
 }

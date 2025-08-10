@@ -1,4 +1,5 @@
 import app/app_socket
+import envoy
 import game/game_socket
 import gleam/dict
 import gleam/erlang/process.{type Subject}
@@ -7,6 +8,7 @@ import gleam/http/response
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/otp/actor.{type Started}
+import gleam/result
 import gleam/set
 import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
@@ -15,6 +17,7 @@ import mist
 import player/player.{Player, Straight}
 import position
 import prng/seed.{type Seed}
+import radiate
 import router
 import shared_messages.{type AppSharedMsg}
 import uuid_colour
@@ -24,12 +27,27 @@ import wisp/wisp_mist
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() {
+  let env = envoy.get("ENV")
+  case env {
+    Ok("PROD") -> Nil
+    _ -> {
+      let _ =
+        radiate.new()
+        |> radiate.add_dir(".")
+        |> radiate.start()
+      Nil
+    }
+  }
+
   wisp.configure_logger()
 
   let assert Ok(topic) = glubsub.new_topic()
   let lobby_manager = lobby_manager.start(topic)
 
-  let secret_key_base = "glurve"
+  let secret_key_base =
+    envoy.get("SECRET_KEY_BASE")
+    |> result.lazy_unwrap(fn() { wisp.random_string(64) })
+
   let seed = seed.random()
 
   let wisp_handler =
@@ -50,7 +68,7 @@ pub fn main() {
   let assert Ok(_) =
     overall_handler
     |> mist.new
-    |> mist.bind("localhost")
+    |> mist.bind("0.0.0.0")
     |> mist.port(1234)
     |> mist.start
 
@@ -109,18 +127,18 @@ fn serve_game_ws(
     set.to_list(lobby_info.players)
     |> list.zip(positions)
     |> list.fold(dict.new(), fn(acc, zipped) {
-      let #(player_id, pos) = zipped
+      let #(player, pos) = zipped
       let player =
         Player(
-          id: player_id,
-          colour: uuid_colour.colour_for_uuid(player_id),
+          id: player.id,
+          colour: uuid_colour.colour_for_uuid(player.id),
           position: pos,
           speed: 0.0,
           angle: 0.0,
           tail: [],
           turning: Straight,
         )
-      dict.insert(acc, player_id, player)
+      dict.insert(acc, player.id, player)
     })
 
   mist.websocket(

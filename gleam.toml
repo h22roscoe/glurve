@@ -12,21 +12,24 @@ repository = { type = "github", user = "h22roscoe", repo = "glurve" }
 
 target = "erlang"
 
+gleam = "1.12.0"
+
 [dependencies]
+envoy = ">= 1.0.2 and < 2.0.0"
 gleam_stdlib = ">= 0.44.0 and < 2.0.0"
-lustre = ">= 5.2.1 and < 6.0.0"
-mist = ">= 5.0.2 and < 6.0.0"
 gleam_otp = ">= 1.0.0 and < 2.0.0"
 gleam_json = ">= 3.0.2 and < 4.0.0"
 gleam_http = ">= 4.1.1 and < 5.0.0"
 gleam_erlang = ">= 1.2.0 and < 2.0.0"
 gleam_community_maths = ">= 2.0.0 and < 3.0.0"
 gleam_community_colour = ">= 2.0.2 and < 3.0.0"
-prng = ">= 4.0.1 and < 5.0.0"
-gleam_yielder = ">= 1.1.0 and < 2.0.0"
 glubsub = ">= 1.2.0 and < 2.0.0"
 gluid = ">= 1.1.0 and < 2.0.0"
+lustre = ">= 5.3.2 and < 6.0.0"
+mist = ">= 5.0.2 and < 6.0.0"
+prng = ">= 4.0.1 and < 5.0.0"
 wisp = ">= 1.8.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
+radiate = { git = "https://github.com/h22roscoe/gleam-radiate.git", ref = "735d957c76af6a654334432fe94fff6fcb748f91" }

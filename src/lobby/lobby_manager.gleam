@@ -26,11 +26,24 @@ pub opaque type LobbyManagerState {
 }
 
 pub type LobbyManagerMsg {
-  CreateLobby(name: String, max_players: Int)
+  CreateLobby(
+    name: String,
+    host_id: String,
+    max_players: Int,
+    map: String,
+    mode: String,
+    region: String,
+  )
   RemoveLobby(name: String)
   ListLobbies(
     reply_with: Subject(dict.Dict(String, Started(Subject(LobbyMsg)))),
   )
+  SearchLobbies(search: String)
+  UpdateLobbyName(name: String)
+  UpdateLobbyMaxPlayers(max_players: Int)
+  UpdateLobbyMap(map: String)
+  UpdateLobbyMode(mode: String)
+  UpdateLobbyRegion(region: String)
 }
 
 fn handle_lobby_manager_msg(
@@ -38,8 +51,9 @@ fn handle_lobby_manager_msg(
   msg: LobbyManagerMsg,
 ) -> actor.Next(LobbyManagerState, LobbyManagerMsg) {
   case msg {
-    CreateLobby(name, max_players) -> {
-      let lobby = lobby.start(name, max_players, state.topic)
+    CreateLobby(name, host_id, max_players, map, mode, region) -> {
+      let lobby =
+        lobby.start(name, host_id, max_players, map, mode, region, state.topic)
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
@@ -65,15 +79,40 @@ fn handle_lobby_manager_msg(
       process.send(reply_with, state.lobbies)
       actor.continue(state)
     }
+    SearchLobbies(_search) -> {
+      actor.continue(state)
+    }
+    UpdateLobbyName(_name) -> {
+      actor.continue(state)
+    }
+    UpdateLobbyMaxPlayers(_max_players) -> {
+      actor.continue(state)
+    }
+    UpdateLobbyMap(_map) -> {
+      actor.continue(state)
+    }
+    UpdateLobbyMode(_mode) -> {
+      actor.continue(state)
+    }
+    UpdateLobbyRegion(_region) -> {
+      actor.continue(state)
+    }
   }
 }
 
 pub fn create_lobby(
   subject: Subject(LobbyManagerMsg),
   name: String,
+  host_id: String,
   max_players: Int,
+  map: String,
+  mode: String,
+  region: String,
 ) -> Nil {
-  process.send(subject, CreateLobby(name, max_players))
+  process.send(
+    subject,
+    CreateLobby(name, host_id, max_players, map, mode, region),
+  )
 }
 
 pub fn remove_lobby(subject: Subject(LobbyManagerMsg), name: String) -> Nil {
