@@ -520,121 +520,139 @@ fn update_lobby_max_players(max_players: String) -> AppMsg {
 fn view_game(model: AppModel) -> Element(AppMsg) {
   case model.current_lobby {
     Some(lobby_info) ->
-      html.div([attribute.id("game"), attribute.class("screen")], [
-        html.div([attribute.class("hud")], [
-          html.div([attribute.class("stat")], [html.text("Round 1/5")]),
-          html.div([attribute.class("stat")], [html.text("Speed x1.0")]),
-          html.div([attribute.class("stat")], [html.text("Gaps: On")]),
-          html.div([attribute.class("stat")], [html.text("Ping: 24ms")]),
-        ]),
-        html.div([attribute.class("board")], [
-          html.div([attribute.class("playfield")], [
-            html.main([attribute.class("game-canvas-wrapper")], [
+      html.div([attribute.class("container")], [
+        html.div([attribute.id("game"), attribute.class("screen")], [
+          html.div([attribute.class("hud")], [
+            html.div([attribute.class("stat")], [html.text("Round 1/5")]),
+            html.div([attribute.class("stat")], [html.text("Speed x1.0")]),
+            html.div([attribute.class("stat")], [html.text("Gaps: On")]),
+            html.div([attribute.class("stat")], [html.text("Ping: 24ms")]),
+          ]),
+          html.div([attribute.class("board")], [
+            html.div([attribute.class("playfield")], [
+              html.main([attribute.class("game-canvas-wrapper")], [
+                html.div(
+                  [
+                    attribute.class("game-wrapper"),
+                    // Scales with viewport, capped for large screens
+                    attribute.style("width", "min(80vmin, 820px)"),
+                    attribute.style("height", "min(80vmin, 820px)"),
+                  ],
+                  [
+                    server_component.element(
+                      [server_component.route("/ws/" <> lobby_info.name)],
+                      [],
+                    ),
+                  ],
+                ),
+              ]),
+            ]),
+          ]),
+          html.aside([attribute.class("sidebar")], [
+            html.div([attribute.class("panel scoreboard")], [
+              html.h3([], [html.text("Scoreboard")]),
+              html.div([attribute.class("score-row")], [
+                html.div(
+                  [
+                    attribute.class("swatch"),
+                    attribute.style("background", "#6be675"),
+                  ],
+                  [],
+                ),
+                html.div([], [html.text("Harry")]),
+                html.div([attribute.style("font-weight", "800")], [
+                  html.text("12"),
+                ]),
+              ]),
+              html.div([attribute.class("score-row")], [
+                html.div(
+                  [
+                    attribute.class("swatch"),
+                    attribute.style("background", "#58b3ff"),
+                  ],
+                  [],
+                ),
+                html.div([], [html.text("Ada")]),
+                html.div([attribute.style("font-weight", "800")], [
+                  html.text("9"),
+                ]),
+              ]),
+              html.div([attribute.class("score-row")], [
+                html.div(
+                  [
+                    attribute.class("swatch"),
+                    attribute.style("background", "#b48bff"),
+                  ],
+                  [],
+                ),
+                html.div([], [html.text("Lin")]),
+                html.div([attribute.style("font-weight", "800")], [
+                  html.text("5"),
+                ]),
+              ]),
+            ]),
+            html.div([attribute.class("panel")], [
+              html.h3([], [html.text("Match Options")]),
               html.div(
                 [
-                  attribute.class("game-wrapper"),
-                  // Scales with viewport, capped for large screens
-                  attribute.style("width", "min(80vmin, 820px)"),
-                  attribute.style("height", "min(80vmin, 820px)"),
+                  attribute.class("item"),
+                  attribute.style("margin-bottom", "8px"),
                 ],
                 [
-                  server_component.element(
-                    [server_component.route("/ws/" <> lobby_info.name)],
-                    [],
+                  html.div([], [html.text("Target Points")]),
+                  html.div(
+                    [
+                      attribute.class("pill"),
+                      attribute.style("color", "#ffaff3"),
+                    ],
+                    [html.text("20")],
                   ),
                 ],
               ),
-            ]),
-          ]),
-        ]),
-        html.aside([attribute.class("sidebar")], [
-          html.div([attribute.class("panel scoreboard")], [
-            html.h3([], [html.text("Scoreboard")]),
-            html.div([attribute.class("score-row")], [
               html.div(
                 [
-                  attribute.class("swatch"),
-                  attribute.style("background", "#6be675"),
-                ],
-                [],
-              ),
-              html.div([], [html.text("Harry")]),
-              html.div([attribute.style("font-weight", "800")], [
-                html.text("12"),
-              ]),
-            ]),
-            html.div([attribute.class("score-row")], [
-              html.div(
-                [
-                  attribute.class("swatch"),
-                  attribute.style("background", "#58b3ff"),
-                ],
-                [],
-              ),
-              html.div([], [html.text("Ada")]),
-              html.div([attribute.style("font-weight", "800")], [html.text("9")]),
-            ]),
-            html.div([attribute.class("score-row")], [
-              html.div(
-                [
-                  attribute.class("swatch"),
-                  attribute.style("background", "#b48bff"),
-                ],
-                [],
-              ),
-              html.div([], [html.text("Lin")]),
-              html.div([attribute.style("font-weight", "800")], [html.text("5")]),
-            ]),
-          ]),
-          html.div([attribute.class("panel")], [
-            html.h3([], [html.text("Match Options")]),
-            html.div(
-              [attribute.class("item"), attribute.style("margin-bottom", "8px")],
-              [
-                html.div([], [html.text("Target Points")]),
-                html.div(
-                  [attribute.class("pill"), attribute.style("color", "#ffaff3")],
-                  [html.text("20")],
-                ),
-              ],
-            ),
-            html.div(
-              [attribute.class("item"), attribute.style("margin-bottom", "8px")],
-              [
-                html.div([], [html.text("Gap Frequency")]),
-                html.div(
-                  [attribute.class("pill"), attribute.style("color", "#ffaff3")],
-                  [html.text("MED")],
-                ),
-              ],
-            ),
-            html.div([attribute.class("panel")], [
-              html.div(
-                [
-                  attribute.style("font-weight", "800"),
+                  attribute.class("item"),
                   attribute.style("margin-bottom", "8px"),
                 ],
-                [html.text("Controls")],
-              ),
-              html.div([attribute.style("margin-bottom", "6px")], [
-                html.kbd([], [html.text("←")]),
-                html.text(" / "),
-                html.kbd([], [html.text("→")]),
-                html.text(" Turn"),
-              ]),
-              html.div([], [
-                html.kbd([], [html.text("P")]),
-                html.text(" Pause"),
-              ]),
-            ]),
-            html.div([attribute.class("panel")], [
-              html.button(
                 [
-                  attribute.class("btn btn--ghost"),
-                  event.on_click(LobbyMsg(LeaveLobby(model.player))),
+                  html.div([], [html.text("Gap Frequency")]),
+                  html.div(
+                    [
+                      attribute.class("pill"),
+                      attribute.style("color", "#ffaff3"),
+                    ],
+                    [html.text("MED")],
+                  ),
                 ],
-                [html.text("Leave")],
               ),
+              html.div([attribute.class("panel")], [
+                html.div(
+                  [
+                    attribute.style("font-weight", "800"),
+                    attribute.style("margin-bottom", "8px"),
+                  ],
+                  [html.text("Controls")],
+                ),
+                html.div([attribute.style("margin-bottom", "6px")], [
+                  html.kbd([], [html.text("←")]),
+                  html.text(" / "),
+                  html.kbd([], [html.text("→")]),
+                  html.text(" Turn"),
+                ]),
+                html.div([], [
+                  html.kbd([], [html.text("P")]),
+                  html.text(" Pause"),
+                ]),
+              ]),
+              html.div([attribute.class("panel")], [
+                html.button(
+                  [
+                    attribute.class("btn btn--ghost"),
+                    event.on_click(LobbyMsg(LeaveLobby(model.player))),
+                  ],
+                  [html.text("Leave")],
+                ),
+              ]),
             ]),
           ]),
         ]),
@@ -717,7 +735,7 @@ fn view_lobby_list(model: AppModel) -> Element(AppMsg) {
       |> list.map(pair.second)
   }
 
-  html.div([attribute.class("panel")], [
+  html.div([attribute.class("panel room-list")], [
     html.div(
       [attribute.class("toolbar"), attribute.style("margin-bottom", "10px")],
       [
@@ -742,134 +760,128 @@ fn view_lobby_list(model: AppModel) -> Element(AppMsg) {
 }
 
 fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
-  html.div(
-    [
-      attribute.class("panel"),
-      attribute.class("room-form"),
-    ],
-    [
-      // Room name row
-      html.div(
-        [
-          attribute.class("row"),
-          attribute.style("grid-template-columns", "1fr"),
-        ],
-        [
-          html.div([attribute.class("field")], [
-            html.label([attribute.for("room-name")], [html.text("Room name")]),
-            html.input([
-              attribute.id("room-name"),
-              attribute.placeholder("e.g., Harry's Room"),
-              attribute.type_("text"),
-              attribute.required(True),
-              attribute.value(model.lobby_name_input |> option.unwrap("")),
-              event.on_input(update_lobby_name),
-            ]),
-          ]),
-        ],
-      ),
-      // Region and Mode row
-      html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
+  html.div([attribute.class("panel room-form")], [
+    // Room name row
+    html.div(
+      [
+        attribute.class("row"),
+        attribute.style("grid-template-columns", "1fr"),
+      ],
+      [
         html.div([attribute.class("field")], [
-          html.label([attribute.for("region")], [html.text("Region")]),
-          html.select([attribute.id("region")], [
-            html.option([], "EU"),
-            html.option([], "US"),
-            html.option([], "AS"),
+          html.label([attribute.for("room-name")], [html.text("Room name")]),
+          html.input([
+            attribute.id("room-name"),
+            attribute.placeholder("e.g., Harry's Room"),
+            attribute.type_("text"),
+            attribute.required(True),
+            attribute.value(model.lobby_name_input |> option.unwrap("")),
+            event.on_input(update_lobby_name),
           ]),
         ]),
-        html.div([attribute.class("field")], [
-          html.label([attribute.for("mode")], [html.text("Mode")]),
-          html.select([attribute.id("mode")], [
-            html.option([], "Points"),
-            html.option([], "Last Stand"),
-          ]),
+      ],
+    ),
+    // Region and Mode row
+    html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("region")], [html.text("Region")]),
+        html.select([attribute.id("region")], [
+          html.option([], "EU"),
+          html.option([], "US"),
+          html.option([], "AS"),
         ]),
       ]),
-      // Max players and Map row
-      html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
-        html.div([attribute.class("field")], [
-          html.label([attribute.for("max")], [html.text("Max players")]),
-          html.select(
-            [attribute.id("max"), event.on_change(update_lobby_max_players)],
-            [
-              html.option(
-                [
-                  attribute.selected(
-                    model.lobby_max_players_input |> option.unwrap(4) == 4,
-                  ),
-                ],
-                "4",
-              ),
-              html.option(
-                [
-                  attribute.selected(
-                    model.lobby_max_players_input |> option.unwrap(4) == 6,
-                  ),
-                ],
-                "6",
-              ),
-              html.option(
-                [
-                  attribute.selected(
-                    model.lobby_max_players_input |> option.unwrap(4) == 8,
-                  ),
-                ],
-                "8",
-              ),
-            ],
-          ),
-        ]),
-        html.div([attribute.class("field")], [
-          html.label([attribute.for("map")], [html.text("Map")]),
-          html.select([attribute.id("map")], [
-            html.option([], "Classic"),
-            html.option([], "Tight"),
-            html.option([], "Wide"),
-          ]),
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("mode")], [html.text("Mode")]),
+        html.select([attribute.id("mode")], [
+          html.option([], "Points"),
+          html.option([], "Last Stand"),
         ]),
       ]),
-      // Toolbar row
-      html.div(
-        [
-          attribute.class("toolbar"),
-          attribute.style("margin-top", "12px"),
-          attribute.style("justify-content", "flex-end"),
-        ],
-        [
-          html.button([attribute.class("btn"), attribute.class("btn--ghost")], [
-            html.text("Join by Code"),
-          ]),
-          html.button(
-            [
-              attribute.class("btn"),
-              case model.lobby_name_input {
-                Some(name) if name != "" -> attribute.disabled(False)
-                Some(_) -> attribute.disabled(True)
-                None -> attribute.disabled(True)
-              },
-              case model.lobby_name_input {
-                Some(name) if name != "" ->
-                  event.on_click(
-                    LobbyManagerMsg(CreateLobby(
-                      name,
-                      model.player.id,
-                      model.lobby_max_players_input |> option.unwrap(4),
-                      model.lobby_map_input |> option.unwrap(""),
-                      model.lobby_mode_input |> option.unwrap(""),
-                      model.lobby_region_input |> option.unwrap(""),
-                    )),
-                  )
-                Some(_) -> attribute.none()
-                None -> attribute.none()
-              },
-            ],
-            [html.text("Create Room")],
-          ),
-        ],
-      ),
-    ],
-  )
+    ]),
+    // Max players and Map row
+    html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("max")], [html.text("Max players")]),
+        html.select(
+          [attribute.id("max"), event.on_change(update_lobby_max_players)],
+          [
+            html.option(
+              [
+                attribute.selected(
+                  model.lobby_max_players_input |> option.unwrap(4) == 4,
+                ),
+              ],
+              "4",
+            ),
+            html.option(
+              [
+                attribute.selected(
+                  model.lobby_max_players_input |> option.unwrap(4) == 6,
+                ),
+              ],
+              "6",
+            ),
+            html.option(
+              [
+                attribute.selected(
+                  model.lobby_max_players_input |> option.unwrap(4) == 8,
+                ),
+              ],
+              "8",
+            ),
+          ],
+        ),
+      ]),
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("map")], [html.text("Map")]),
+        html.select([attribute.id("map")], [
+          html.option([], "Classic"),
+          html.option([], "Tight"),
+          html.option([], "Wide"),
+        ]),
+      ]),
+    ]),
+    // Toolbar row
+    html.div(
+      [
+        attribute.class("toolbar"),
+        attribute.style("margin-top", "12px"),
+        attribute.style("justify-content", "flex-end"),
+      ],
+      [
+        html.button([attribute.class("btn"), attribute.class("btn--ghost")], [
+          html.text("Join by Code"),
+        ]),
+        html.button(
+          [
+            attribute.class("btn"),
+            case model.lobby_name_input {
+              Some(name) if name != "" -> attribute.disabled(False)
+              Some(_) -> attribute.disabled(True)
+              None -> attribute.disabled(True)
+            },
+            case model.lobby_name_input {
+              Some(name) if name != "" ->
+                event.on_click(
+                  LobbyManagerMsg(CreateLobby(
+                    name,
+                    model.player.id,
+                    model.lobby_max_players_input |> option.unwrap(4),
+                    model.lobby_map_input |> option.unwrap(""),
+                    model.lobby_mode_input |> option.unwrap(""),
+                    model.lobby_region_input |> option.unwrap(""),
+                  )),
+                )
+              Some(_) -> attribute.none()
+              None -> attribute.none()
+            },
+          ],
+          [html.text("Create Room")],
+        ),
+      ],
+    ),
+  ])
 }
 
 fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
@@ -894,11 +906,13 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
         html.div([attribute.class("player")], [
           html.div([attribute.class("avatar")], [html.text("🟢")]),
           html.div([], [
-            html.div([attribute.style("font-weight", "700")], [
+            html.h3([], [
               html.text(host.name),
             ]),
             html.div([attribute.class("meta")], [
-              html.text(lobby.player_status_to_string(host.status)),
+              html.text(
+                "Status: " <> lobby.player_status_to_string(host.status),
+              ),
             ]),
           ]),
           html.div([attribute.class("player-actions")], [
@@ -935,11 +949,13 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
         html.div([attribute.class("player")], [
           html.div([attribute.class("avatar")], [html.text("🟣")]),
           html.div([], [
-            html.div([attribute.style("font-weight", "700")], [
+            html.h3([], [
               html.text(player.name),
             ]),
             html.div([attribute.class("meta")], [
-              html.text(lobby.player_status_to_string(player.status)),
+              html.text(
+                "Status: " <> lobby.player_status_to_string(player.status),
+              ),
             ]),
           ]),
           case we_are_host {
@@ -1002,5 +1018,5 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
     }
   }
 
-  html.div([attribute.class("panel")], [content])
+  html.div([attribute.class("panel room-players")], [content])
 }
