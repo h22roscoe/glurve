@@ -92,7 +92,9 @@ fn serve_html(req: Request) -> Response {
             ),
           ]),
         ]),
-        server_component.element([server_component.route("/ws")], []),
+        html.div([attribute.class("app")], [
+          server_component.element([server_component.route("/ws")], []),
+        ]),
       ]),
     ])
     |> element.to_document_string_tree

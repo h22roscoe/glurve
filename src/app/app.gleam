@@ -442,73 +442,82 @@ fn view_lobby(model: AppModel) -> Element(AppMsg) {
       )
   }
 
-  html.div([], [
-    html.div([attribute.class("container")], [
-      html.header([attribute.class("page-header")], [
-        html.h1([], [html.text("Lobby area")]),
-      ]),
-      html.div([attribute.class("content")], [
-        html.div([attribute.class("section")], [
-          html.h2([], [html.text("Create New Lobby")]),
-          html.div([attribute.class("lobby-form")], [
-            html.label([attribute.for("lobby-name")], [html.text("Lobby Name")]),
-            view_lobby_name_input(create_lobby),
-          ]),
-        ]),
-        html.div([attribute.class("section")], [
-          html.h2([], [html.text("Current Lobby")]),
-          html.div([attribute.id("current-lobby-info")], [
-            case current_lobby {
-              Some(lobby_info) -> {
-                html.div([attribute.class("lobby-item current-lobby")], [
-                  html.div([attribute.class("lobby-info")], [
-                    html.h3([], [
-                      html.text("🎯 Current Lobby: " <> lobby_info.name),
-                    ]),
-                    html.p([], [
-                      html.text(
-                        "Ready players: "
-                        <> int.to_string(set.size(lobby_info.ready_players))
-                        <> "/"
-                        <> int.to_string(set.size(lobby_info.players))
-                        <> " • Status: "
-                        <> lobby.status_to_string(lobby_info.status),
-                      ),
-                    ]),
-                  ]),
-                  html.button(
-                    [
-                      attribute.class("btn"),
-                      event.on_click(LobbyMsg(PlayerReady(player_id))),
-                    ],
-                    [html.text("Ready")],
-                  ),
-                  html.button(
-                    [
-                      attribute.id("leave-lobby"),
-                      attribute.class("btn btn-secondary"),
-                      attribute.style("margin-left", "10px"),
-                      event.on_click(LobbyMsg(LeaveLobby(player_id))),
-                    ],
-                    [html.text("Leave")],
-                  ),
-                ])
-              }
-              None ->
-                html.p([attribute.class("muted-text")], [
-                  html.text("Join a lobby to start playing!"),
-                ])
-            },
-          ]),
-        ]),
-        html.div([attribute.class("section")], [
-          html.h2([], [html.text("Available Lobbies")]),
-          lobbies_list,
-        ]),
-      ]),
-      html.div([attribute.id("status"), attribute.class("status")], []),
-    ]),
+  html.div([attribute.id("lobby"), attribute.class("screen")], [
+    view_lobby_list(model),
+    view_create_join_form(model),
+    view_lobby_players(model),
   ])
+}
+
+fn old_bit() {
+  // html.div([], [
+  //   html.div([attribute.class("container")], [
+  //     html.header([attribute.class("page-header")], [
+  //       html.h1([], [html.text("Lobby area")]),
+  //     ]),
+  //     html.div([attribute.class("content")], [
+  //       html.div([attribute.class("section")], [
+  //         html.h2([], [html.text("Create New Lobby")]),
+  //         html.div([attribute.class("lobby-form")], [
+  //           html.label([attribute.for("lobby-name")], [html.text("Lobby Name")]),
+  //           view_lobby_name_input(create_lobby),
+  //         ]),
+  //       ]),
+  //       html.div([attribute.class("section")], [
+  //         html.h2([], [html.text("Current Lobby")]),
+  //         html.div([attribute.id("current-lobby-info")], [
+  //           case current_lobby {
+  //             Some(lobby_info) -> {
+  //               html.div([attribute.class("lobby-item current-lobby")], [
+  //                 html.div([attribute.class("lobby-info")], [
+  //                   html.h3([], [
+  //                     html.text("🎯 Current Lobby: " <> lobby_info.name),
+  //                   ]),
+  //                   html.p([], [
+  //                     html.text(
+  //                       "Ready players: "
+  //                       <> int.to_string(set.size(lobby_info.ready_players))
+  //                       <> "/"
+  //                       <> int.to_string(set.size(lobby_info.players))
+  //                       <> " • Status: "
+  //                       <> lobby.status_to_string(lobby_info.status),
+  //                     ),
+  //                   ]),
+  //                 ]),
+  //                 html.button(
+  //                   [
+  //                     attribute.class("btn"),
+  //                     event.on_click(LobbyMsg(PlayerReady(player_id))),
+  //                   ],
+  //                   [html.text("Ready")],
+  //                 ),
+  //                 html.button(
+  //                   [
+  //                     attribute.id("leave-lobby"),
+  //                     attribute.class("btn btn-secondary"),
+  //                     attribute.style("margin-left", "10px"),
+  //                     event.on_click(LobbyMsg(LeaveLobby(player_id))),
+  //                   ],
+  //                   [html.text("Leave")],
+  //                 ),
+  //               ])
+  //             }
+  //             None ->
+  //               html.p([attribute.class("muted-text")], [
+  //                 html.text("Join a lobby to start playing!"),
+  //               ])
+  //           },
+  //         ]),
+  //       ]),
+  //       html.div([attribute.class("section")], [
+  //         html.h2([], [html.text("Available Lobbies")]),
+  //         lobbies_list,
+  //       ]),
+  //     ]),
+  //     html.div([attribute.id("status"), attribute.class("status")], []),
+  //   ]),
+  // ])
+  Nil
 }
 
 fn create_lobby(name: String) -> AppMsg {
@@ -581,4 +590,211 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
     None ->
       html.div([attribute.class("game-empty")], [html.text("No game selected.")])
   }
+}
+
+fn view_lobby_list(model: AppModel) -> Element(AppMsg) {
+  html.div([attribute.class("panel")], [
+    html.div(
+      [attribute.class("toolbar"), attribute.style("margin-bottom", "10px")],
+      [
+        html.input([
+          attribute.class("search"),
+          attribute.placeholder("Search rooms…"),
+        ]),
+        html.button([attribute.class("btn btn--ghost")], [
+          html.text("Refresh"),
+        ]),
+      ],
+    ),
+    html.div(
+      [
+        attribute.class("list"),
+        attribute.attribute("aria-label", "Room list"),
+      ],
+      [
+        html.div([attribute.class("item")], [
+          html.div([], [
+            html.div([attribute.style("font-weight", "700")], [
+              html.text("Public #1234"),
+            ]),
+            html.div([attribute.class("meta")], [
+              html.text("Map: Classic • Mode: Points • 2/6"),
+            ]),
+          ]),
+          html.div(
+            [
+              attribute.style("display", "flex"),
+              attribute.style("gap", "6px"),
+              attribute.style("align-items", "center"),
+            ],
+            [
+              html.span([attribute.class("pill")], [html.text("EU")]),
+              html.button([attribute.class("btn")], [html.text("Join")]),
+            ],
+          ),
+        ]),
+        html.div([attribute.class("item")], [
+          html.div([], [
+            html.div([attribute.style("font-weight", "700")], [
+              html.text("Friends – OOF"),
+            ]),
+            html.div([attribute.class("meta")], [
+              html.text("Map: Tight • Mode: Last Stand • 5/8"),
+            ]),
+          ]),
+          html.div(
+            [
+              attribute.style("display", "flex"),
+              attribute.style("gap", "6px"),
+              attribute.style("align-items", "center"),
+            ],
+            [
+              html.span([attribute.class("pill")], [html.text("US")]),
+              html.button([attribute.class("btn")], [html.text("Join")]),
+            ],
+          ),
+        ]),
+        html.div([attribute.class("item")], [
+          html.div([], [
+            html.div([attribute.style("font-weight", "700")], [
+              html.text("Practice"),
+            ]),
+            html.div([attribute.class("meta")], [
+              html.text("Map: Wide • Mode: Points • 1/4"),
+            ]),
+          ]),
+          html.div(
+            [
+              attribute.style("display", "flex"),
+              attribute.style("gap", "6px"),
+              attribute.style("align-items", "center"),
+            ],
+            [
+              html.span([attribute.class("pill")], [html.text("EU")]),
+              html.button([attribute.class("btn")], [html.text("Join")]),
+            ],
+          ),
+        ]),
+      ],
+    ),
+  ])
+}
+
+fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
+  html.div([attribute.class("panel"), attribute.class("room-form")], [
+    // Room name row
+    html.div(
+      [attribute.class("row"), attribute.style("grid-template-columns", "1fr")],
+      [
+        html.div([attribute.class("field")], [
+          html.label([attribute.for("room-name")], [html.text("Room name")]),
+          html.input([
+            attribute.id("room-name"),
+            attribute.placeholder("e.g., Harry's Room"),
+          ]),
+        ]),
+      ],
+    ),
+    // Region and Mode row
+    html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("region")], [html.text("Region")]),
+        html.select([attribute.id("region")], [
+          html.option([], "EU"),
+          html.option([], "US"),
+          html.option([], "AS"),
+        ]),
+      ]),
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("mode")], [html.text("Mode")]),
+        html.select([attribute.id("mode")], [
+          html.option([], "Points"),
+          html.option([], "Last Stand"),
+        ]),
+      ]),
+    ]),
+    // Max players and Map row
+    html.div([attribute.class("row"), attribute.style("margin-top", "8px")], [
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("max")], [html.text("Max players")]),
+        html.select([attribute.id("max")], [
+          html.option([], "4"),
+          html.option([attribute.selected(True)], "6"),
+          html.option([], "8"),
+        ]),
+      ]),
+      html.div([attribute.class("field")], [
+        html.label([attribute.for("map")], [html.text("Map")]),
+        html.select([attribute.id("map")], [
+          html.option([], "Classic"),
+          html.option([], "Tight"),
+          html.option([], "Wide"),
+        ]),
+      ]),
+    ]),
+    // Toolbar row
+    html.div(
+      [
+        attribute.class("toolbar"),
+        attribute.style("margin-top", "12px"),
+        attribute.style("justify-content", "flex-end"),
+      ],
+      [
+        html.button([attribute.class("btn"), attribute.class("btn--ghost")], [
+          html.text("Join by Code"),
+        ]),
+        html.button([attribute.class("btn")], [html.text("Create Room")]),
+      ],
+    ),
+  ])
+}
+
+fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
+  html.div([attribute.class("panel")], [
+    html.div(
+      [
+        attribute.style("display", "flex"),
+        attribute.style("align-items", "center"),
+        attribute.style("justify-content", "space-between"),
+        attribute.style("margin-bottom", "8px"),
+      ],
+      [
+        html.div([attribute.style("font-weight", "800")], [html.text("Players")]),
+        html.div([attribute.class("pill")], [html.text("Room Code: 7H9K")]),
+      ],
+    ),
+    html.div([attribute.class("players")], [
+      // Player 1 (Host)
+      html.div([attribute.class("player")], [
+        html.div([attribute.class("avatar")], [html.text("🟢")]),
+        html.div([], [
+          html.div([attribute.style("font-weight", "700")], [html.text("Harry")]),
+          html.div([attribute.class("meta")], [html.text("Ready")]),
+        ]),
+        html.span([attribute.class("pill")], [html.text("Host")]),
+      ]),
+      // Player 2
+      html.div([attribute.class("player")], [
+        html.div([attribute.class("avatar")], [html.text("🔵")]),
+        html.div([], [
+          html.div([attribute.style("font-weight", "700")], [html.text("Ada")]),
+          html.div([attribute.class("meta")], [html.text("Picking color…")]),
+        ]),
+        html.button([attribute.class("btn"), attribute.class("btn--ghost")], [
+          html.text("Kick"),
+        ]),
+      ]),
+      // Player 3
+      html.div([attribute.class("player")], [
+        html.div([attribute.class("avatar")], [html.text("🟣")]),
+        html.div([], [
+          html.div([attribute.style("font-weight", "700")], [html.text("Lin")]),
+          html.div([attribute.class("meta")], [html.text("Not ready")]),
+        ]),
+        html.button([attribute.class("btn"), attribute.class("btn--ghost")], [
+          html.text("Kick"),
+        ]),
+      ]),
+    ]),
+  ])
 }
