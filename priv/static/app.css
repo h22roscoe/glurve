@@ -166,6 +166,7 @@ body.theme-dark .page-nav .toggle-dark {
   border-radius: var(--corner-radius);
   box-shadow: var(--shadow);
   padding: 12px;
+  margin-bottom: 12px;
 }
 
 .row { display: grid; gap: 12px; }
@@ -190,6 +191,23 @@ body.theme-dark .page-nav .toggle-dark {
   color: var(--text-regular);
   font-family: var(--primary-font);
   outline: none;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+}
+.empty-state-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+.empty-state-title {
+  font-weight: var(--font-bold);
+  margin-bottom: 4px;
+}
+.empty-state-text {
+  font-size: 13px;
 }
 
 .list {

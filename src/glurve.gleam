@@ -127,18 +127,18 @@ fn serve_game_ws(
     set.to_list(lobby_info.players)
     |> list.zip(positions)
     |> list.fold(dict.new(), fn(acc, zipped) {
-      let #(player_id, pos) = zipped
+      let #(player, pos) = zipped
       let player =
         Player(
-          id: player_id,
-          colour: uuid_colour.colour_for_uuid(player_id),
+          id: player.id,
+          colour: uuid_colour.colour_for_uuid(player.id),
           position: pos,
           speed: 0.0,
           angle: 0.0,
           tail: [],
           turning: Straight,
         )
-      dict.insert(acc, player_id, player)
+      dict.insert(acc, player.id, player)
     })
 
   mist.websocket(
