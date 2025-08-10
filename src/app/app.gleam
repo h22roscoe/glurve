@@ -91,17 +91,51 @@ fn subscribe(
 }
 
 fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
-  let model =
-    AppModel(
-      state: InLobby,
-      player: lobby.Player(
+  let lobbies = lobby_manager.list_lobbies(args.lobby_manager.data)
+  let player_with_info =
+    dict.to_list(lobbies)
+    |> list.map(fn(pair) {
+      let #(_lobby_name, l) = pair
+      let info = lobby.get_lobby_info(l.data)
+      let player =
+        info.players
+        |> set.to_list()
+        |> list.find(fn(p) { p.id == args.user_id })
+      case player {
+        Ok(player) -> Ok(#(player, info))
+        Error(_) -> Error(Nil)
+      }
+    })
+    |> list.reduce(fn(acc, pair) {
+      case pair {
+        Ok(pair) -> Ok(pair)
+        Error(_) -> acc
+      }
+    })
+    |> result.flatten()
+
+  let player = case player_with_info {
+    Ok(#(player, _info)) -> player
+    Error(_) ->
+      lobby.Player(
         id: args.user_id,
         name: "Anonymous player",
         colour: colour.red,
         status: lobby.NotReady,
-      ),
-      lobbies: lobby_manager.list_lobbies(args.lobby_manager.data),
-      current_lobby: None,
+      )
+  }
+
+  let info = case player_with_info {
+    Ok(#(_, info)) -> Some(info)
+    Error(_) -> None
+  }
+
+  let model =
+    AppModel(
+      state: InLobby,
+      player: player,
+      lobbies: lobbies,
+      current_lobby: info,
       lobby_manager: args.lobby_manager,
       topic: args.topic,
       pending_created_lobby: None,
@@ -355,7 +389,21 @@ fn update_lobby_msg(
     LeaveLobby(player) -> {
       case model.current_lobby {
         Some(lobby_info) -> {
-          #(model, leave_lobby_effect(player, lobby_info.name, model.lobbies))
+          let is_host = lobby_info.host_id == player.id
+          case is_host {
+            True -> #(
+              model,
+              effect.batch([
+                leave_lobby_effect(player, lobby_info.name, model.lobbies),
+                close_lobby_effect(lobby_info.name, model.lobbies),
+                remove_lobby_effect(model.lobby_manager, lobby_info.name),
+              ]),
+            )
+            False -> #(
+              model,
+              leave_lobby_effect(player, lobby_info.name, model.lobbies),
+            )
+          }
         }
         None -> #(model, effect.none())
       }
@@ -728,7 +776,7 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
 }
 
 fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
-  case model.current_lobby {
+  let content = case model.current_lobby {
     None ->
       html.div([attribute.class("empty-state")], [
         html.div([attribute.class("empty-state-icon")], [html.text("🚪")]),
@@ -756,7 +804,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
               html.text(lobby.player_status_to_string(host.status)),
             ]),
           ]),
-          html.div([], [
+          html.div([attribute.class("player-actions")], [
             html.span([attribute.class("pill")], [html.text("Host")]),
             case we_are_host {
               True ->
@@ -809,7 +857,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
           },
           case is_us {
             True ->
-              html.div([], [
+              html.div([attribute.class("player-actions")], [
                 html.span([attribute.class("pill")], [html.text("You")]),
                 html.button(
                   [
@@ -835,7 +883,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
       }
       let player_list = [host_elem, ..other_players_list]
 
-      html.div([attribute.class("panel")], [
+      element.fragment([
         html.div(
           [
             attribute.style("display", "flex"),
@@ -856,4 +904,6 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
       ])
     }
   }
+
+  html.div([attribute.class("panel")], [content])
 }

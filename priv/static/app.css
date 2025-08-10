@@ -151,6 +151,10 @@ body.theme-dark .page-nav .toggle-dark {
   color: var(--text-regular);
   border: 1px dashed var(--card-border);
 }
+.btn--warning {
+  background: var(--faff-pink);
+  color: #000;
+}
 
 .btn:hover {
   border-color: var(--card-border-highlight);
@@ -259,6 +263,12 @@ input, select {
   padding: 8px 10px;
   border: 1px dashed var(--card-border);
   border-radius: var(--corner-radius);
+}
+.player-actions {
+  display: flex;
+  gap: 8px;              /* space between buttons */
+  align-items: center;   /* vertically center them with text/avatars */
+  flex-wrap: wrap;       /* allow wrapping on small screens */
 }
 .avatar {
   width: 28px;
