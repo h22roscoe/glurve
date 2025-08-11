@@ -488,13 +488,19 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
   let head =
     colour.to_svg_head(colour, tip_x, tip_y, left_x, left_y, right_x, right_y)
 
-  let head_keyed = #("head", head)
+  let head_keyed = #("head-" <> colour.to_string(colour), head)
 
   let tail_points_len = list.length(tail_points)
   let tail_points_keyed =
     tail_points
     |> list.index_map(fn(pos, index) {
-      #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
+      #(
+        "tail-"
+          <> colour.to_string(colour)
+          <> "-"
+          <> int.to_string(tail_points_len - index - 1),
+        pos,
+      )
     })
 
   [head_keyed, ..tail_points_keyed]

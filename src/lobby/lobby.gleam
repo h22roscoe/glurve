@@ -6,6 +6,7 @@ import gleam/set.{type Set}
 import glubsub.{type Topic}
 import gluid
 import player/colour
+import prng/random
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
   LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
@@ -108,15 +109,30 @@ fn handle_lobby_msg(
 ) -> actor.Next(LobbyInfo, LobbyMsg) {
   case msg {
     JoinLobby(player, lobby_id) if lobby_id == state.name -> {
+      let used_colours =
+        state.players
+        |> set.to_list()
+        |> list.map(fn(p) { p.colour })
+        |> set.from_list()
+
+      let available_colours =
+        colour.all()
+        |> set.difference(used_colours)
+        |> set.to_list()
+
+      let gen = random.uniform(colour.Red, available_colours)
+      let colour = random.random_sample(gen)
+      let new_player = Player(..player, colour: colour)
+
       case state.status {
         Waiting -> {
           let new_info =
-            LobbyInfo(..state, players: set.insert(state.players, player))
+            LobbyInfo(..state, players: set.insert(state.players, new_player))
           let num_players = set.size(new_info.players)
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(LobbyJoined(player.id, state.name)),
+              LobbySharedMsg(LobbyJoined(new_player.id, state.name)),
             )
           case num_players {
             _ if num_players >= state.max_players -> {

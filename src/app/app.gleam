@@ -131,7 +131,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobby.Player(
         id: args.user_id,
         name: "Anonymous player",
-        colour: colour.Red,
+        colour: colour.Bee,
         status: lobby.NotReady,
       )
   }

@@ -321,7 +321,7 @@ footer .right { display: flex; gap: 10px; }
     "hud hud hud"
     "board board side"
     "controls controls side";
-  grid-template-columns: 1fr 1fr 320px;
+  grid-template-columns: 1fr 1fr auto;
   grid-template-rows: auto 1fr auto;
   display: grid;
   gap: 12px;
@@ -347,7 +347,6 @@ footer .right { display: flex; gap: 10px; }
 .board {
   grid-area: board;
   justify-items: center;
-  margin-bottom: 12px;
   display: grid;
   align-items: center;
 }

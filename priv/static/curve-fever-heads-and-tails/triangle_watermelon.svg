@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <title>watermelon</title>
+  <defs>
+    <clipPath id="clip">
+      <polygon points="20,10 20,90 90,50"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="100" height="100" fill="#f54d5d"/>
+    <rect x="0" y="0" width="100" height="100" fill="#f54d5d"/><ellipse cx="35" cy="35" rx="1.2" ry="2.0" fill="#111" transform="rotate(9 35 35)"/><ellipse cx="45" cy="30" rx="1.2" ry="2.0" fill="#111" transform="rotate(-3 45 30)"/><ellipse cx="55" cy="40" rx="1.2" ry="2.0" fill="#111" transform="rotate(4 55 40)"/><ellipse cx="40" cy="55" rx="1.2" ry="2.0" fill="#111" transform="rotate(17 40 55)"/><ellipse cx="50" cy="60" rx="1.2" ry="2.0" fill="#111" transform="rotate(-5 50 60)"/><ellipse cx="60" cy="50" rx="1.2" ry="2.0" fill="#111" transform="rotate(-4 60 50)"/><rect x="0" y="0" width="100" height="8" fill="#2ea043"/><rect x="0" y="92" width="100" height="8" fill="#2ea043"/>
+  </g>
+  <polygon points="20,10 20,90 90,50" fill="none" stroke="#196d2b" stroke-width="6" stroke-linejoin="round"/>
+</svg>
