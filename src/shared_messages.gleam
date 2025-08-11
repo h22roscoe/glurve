@@ -17,5 +17,6 @@ pub type LobbySharedMsg {
   PlayerBecameReady(player_id: String)
   PlayerBecameNotReady(player_id: String)
   AllPlayersReady
+  PlayerExitedGame(player_id: String)
   LobbyClosed
 }

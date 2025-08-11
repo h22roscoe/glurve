@@ -9,7 +9,7 @@ import player/colour
 import prng/random
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
-  LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
+  LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady, PlayerExitedGame,
 }
 
 pub type Player {
@@ -21,6 +21,7 @@ pub type PlayerStatus {
   NotReady
   PickingColour
   SettingName
+  InGame
 }
 
 pub type LobbyMsg {
@@ -28,6 +29,7 @@ pub type LobbyMsg {
   LeaveLobby(player: Player)
   PlayerReady(player: Player)
   PlayerNotReady(player: Player)
+  ExitGame(player: Player)
   GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
   GetLobbyInfo(reply_with: Subject(LobbyInfo))
   CloseLobby
@@ -100,6 +102,7 @@ pub fn player_status_to_string(status: PlayerStatus) -> String {
     NotReady -> "Not Ready"
     PickingColour -> "Picking Colour"
     SettingName -> "Setting Name"
+    InGame -> "In Game"
   }
 }
 
@@ -186,8 +189,10 @@ fn handle_lobby_msg(
         True -> {
           let assert Ok(_) =
             glubsub.broadcast(state.topic, LobbySharedMsg(AllPlayersReady))
+          let players_in_game =
+            set.map(new_players, fn(p) { Player(..p, status: InGame) })
           let new_state =
-            LobbyInfo(..state, players: new_players, status: Playing)
+            LobbyInfo(..state, players: players_in_game, status: Playing)
           actor.continue(new_state)
         }
         False -> {
@@ -213,6 +218,22 @@ fn handle_lobby_msg(
         glubsub.broadcast(
           state.topic,
           LobbySharedMsg(PlayerBecameNotReady(player.id)),
+        )
+      actor.continue(new_info)
+    }
+    ExitGame(player) -> {
+      let new_players =
+        set.map(state.players, fn(p) {
+          case p.id == player.id {
+            True -> Player(..p, status: NotReady)
+            False -> p
+          }
+        })
+      let new_info = LobbyInfo(..state, players: new_players)
+      let assert Ok(_) =
+        glubsub.broadcast(
+          state.topic,
+          LobbySharedMsg(PlayerExitedGame(player.id)),
         )
       actor.continue(new_info)
     }
@@ -251,6 +272,10 @@ pub fn player_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
 
 pub fn player_not_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
   actor.send(subject, PlayerNotReady(player))
+}
+
+pub fn exit_game(subject: Subject(LobbyMsg), player: Player) -> Nil {
+  actor.send(subject, ExitGame(player))
 }
 
 pub fn get_game_topic(
