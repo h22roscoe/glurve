@@ -1,8 +1,8 @@
 import gleam/dict
 import gleam/int
 import gleam/list
-import gleam_community/colour
 import gleam_community/maths
+import player/colour
 import position.{type Position}
 
 pub const tail_radius = 3.0

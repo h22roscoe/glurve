@@ -8,7 +8,6 @@ import gleam/pair
 import gleam/result
 import gleam/set
 import gleam/string
-import gleam_community/colour
 import glubsub.{type Topic}
 import lobby/lobby.{
   type LobbyInfo, type LobbyMsg, CloseLobby, GetGameTopic, GetLobbyInfo,
@@ -27,6 +26,7 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
+import player/colour
 import shared_messages.{
   type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
   AllPlayersReady, LobbyClosed, LobbyCreated, LobbyJoined, LobbyLeft,
@@ -131,7 +131,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobby.Player(
         id: args.user_id,
         name: "Anonymous player",
-        colour: colour.red,
+        colour: colour.Red,
         status: lobby.NotReady,
       )
   }
@@ -666,13 +666,13 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
                   [html.text("Controls")],
                 ),
                 html.div([attribute.style("margin-bottom", "6px")], [
-                  html.kbd([], [html.text("←")]),
+                  html.kbd([attribute.title("Left")], [html.text("←")]),
                   html.text(" / "),
-                  html.kbd([], [html.text("→")]),
+                  html.kbd([attribute.title("Right")], [html.text("→")]),
                   html.text(" Turn"),
                 ]),
                 html.div([], [
-                  html.kbd([], [html.text("P")]),
+                  html.kbd([attribute.title("Pause")], [html.text("p")]),
                   html.text(" Pause"),
                 ]),
               ]),
@@ -936,7 +936,27 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
       let we_are_host = host.id == model.player.id
       let host_elem =
         html.div([attribute.class("player")], [
-          html.div([attribute.class("avatar")], [html.text("🟢")]),
+          html.div([attribute.class("avatar")], [
+            svg.svg(
+              [
+                attribute.class("player-avatar"),
+                attribute.attribute("viewBox", "0 0 100 100"),
+                attribute.attribute("width", "24px"),
+                attribute.attribute("height", "24px"),
+              ],
+              [
+                colour.to_svg_head(
+                  host.colour,
+                  20.0,
+                  10.0,
+                  20.0,
+                  90.0,
+                  90.0,
+                  50.0,
+                ),
+              ],
+            ),
+          ]),
           html.div([], [
             html.h3([], [
               html.text(host.name),
@@ -979,7 +999,27 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
         let is_us = player.id == model.player.id
 
         html.div([attribute.class("player")], [
-          html.div([attribute.class("avatar")], [html.text("🟣")]),
+          html.div([attribute.class("avatar")], [
+            svg.svg(
+              [
+                attribute.class("player-avatar"),
+                attribute.attribute("viewBox", "0 0 100 100"),
+                attribute.attribute("width", "24px"),
+                attribute.attribute("height", "24px"),
+              ],
+              [
+                colour.to_svg_head(
+                  player.colour,
+                  20.0,
+                  10.0,
+                  20.0,
+                  90.0,
+                  90.0,
+                  50.0,
+                ),
+              ],
+            ),
+          ]),
           html.div([], [
             html.h3([], [
               html.text(player.name),

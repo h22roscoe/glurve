@@ -3,9 +3,9 @@ import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/otp/actor.{type Started}
 import gleam/set.{type Set}
-import gleam_community/colour
 import glubsub.{type Topic}
 import gluid
+import player/colour
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
   LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady,
