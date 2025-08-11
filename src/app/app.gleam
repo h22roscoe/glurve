@@ -102,7 +102,18 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
         |> set.to_list()
         |> list.find(fn(p) { p.id == args.user_id })
       case player {
-        Ok(player) -> Ok(#(player, info))
+        Ok(player) -> {
+          // Ensure current user is not ready on init and tell the other players with
+          // the effect to unready them, our own user may not be subscribed yet
+          let unready_player = lobby.Player(..player, status: lobby.NotReady)
+          let unready_info =
+            lobby.LobbyInfo(
+              ..info,
+              players: set.delete(info.players, player)
+                |> set.insert(unready_player),
+            )
+          Ok(#(unready_player, unready_info))
+        }
         Error(_) -> Error(Nil)
       }
     })
@@ -133,7 +144,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
   let model =
     AppModel(
       state: InLobby,
-      player: lobby.Player(..player, status: lobby.NotReady),
+      player: player,
       lobbies: lobbies,
       current_lobby: info,
       lobby_manager: args.lobby_manager,
@@ -146,7 +157,19 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobby_mode_input: None,
       lobby_region_input: None,
     )
-  #(model, subscribe(args.topic, RecievedAppSharedMsg))
+
+  case info {
+    Some(lobby_info) -> {
+      #(
+        model,
+        effect.batch([
+          subscribe(args.topic, RecievedAppSharedMsg),
+          player_not_ready_effect(player, lobby_info.name, model.lobbies),
+        ]),
+      )
+    }
+    None -> #(model, subscribe(args.topic, RecievedAppSharedMsg))
+  }
 }
 
 fn update(model: AppModel, msg: AppMsg) -> #(AppModel, Effect(AppMsg)) {
@@ -420,7 +443,15 @@ fn update_lobby_msg(
       }
     }
     PlayerNotReady(player) -> {
-      #(model, player_not_ready_effect(player, model.topic))
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(
+            model,
+            player_not_ready_effect(player, lobby_info.name, model.lobbies),
+          )
+        }
+        None -> #(model, effect.none())
+      }
     }
     GetGameTopic(_) -> {
       #(model, effect.none())
@@ -474,11 +505,12 @@ fn player_ready_effect(
 
 fn player_not_ready_effect(
   player: lobby.Player,
-  topic: Topic(AppSharedMsg(LobbyMsg)),
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
 ) {
   use _dispatch <- effect.from
-  let assert Ok(_) =
-    glubsub.broadcast(topic, LobbySharedMsg(PlayerBecameNotReady(player.id)))
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.player_not_ready(lobby.data, player)
   Nil
 }
 
