@@ -133,7 +133,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
   let model =
     AppModel(
       state: InLobby,
-      player: player,
+      player: lobby.Player(..player, status: lobby.NotReady),
       lobbies: lobbies,
       current_lobby: info,
       lobby_manager: args.lobby_manager,
