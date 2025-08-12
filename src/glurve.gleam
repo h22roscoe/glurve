@@ -20,7 +20,6 @@ import prng/seed.{type Seed}
 import radiate
 import router
 import shared_messages.{type AppSharedMsg}
-import uuid_colour
 import wisp
 import wisp/wisp_mist
 
@@ -131,7 +130,7 @@ fn serve_game_ws(
       let player =
         Player(
           id: player.id,
-          colour: uuid_colour.colour_for_uuid(player.id),
+          colour: player.colour,
           position: pos,
           speed: 0.0,
           angle: 0.0,

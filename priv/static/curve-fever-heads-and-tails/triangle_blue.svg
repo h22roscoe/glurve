@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <title>blue</title>
+  <defs>
+    <clipPath id="clip">
+      <polygon points="20,10 20,90 90,50"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="100" height="100" fill="#1e88e5"/>
+    
+  </g>
+  <polygon points="20,10 20,90 90,50" fill="none" stroke="#186cb7" stroke-width="6" stroke-linejoin="round"/>
+</svg>

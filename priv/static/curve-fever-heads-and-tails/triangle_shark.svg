@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <title>shark</title>
+  <defs>
+    <clipPath id="clip">
+      <polygon points="20,10 20,90 90,50"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="100" height="100" fill="#7a8a97"/>
+    <rect x="0" y="0" width="100" height="100" fill="#7a8a97"/><rect x="0" y="45" width="80" height="10" fill="#5c6b77"/><polygon points="64.0,58 66.0,50 64.0,42" fill="#fff"/><polygon points="67.2,58 69.2,50 67.2,42" fill="#fff"/><polygon points="70.4,58 72.4,50 70.4,42" fill="#fff"/><polygon points="73.6,58 75.6,50 73.6,42" fill="#fff"/><polygon points="76.8,58 78.8,50 76.8,42" fill="#fff"/><polygon points="80.0,58 82.0,50 80.0,42" fill="#fff"/><polygon points="83.2,58 85.2,50 83.2,42" fill="#fff"/><polygon points="86.4,58 88.4,50 86.4,42" fill="#fff"/><circle cx="40" cy="40" r="3.2" fill="#0b0f14"/>
+  </g>
+  <polygon points="20,10 20,90 90,50" fill="none" stroke="#44515a" stroke-width="6" stroke-linejoin="round"/>
+</svg>

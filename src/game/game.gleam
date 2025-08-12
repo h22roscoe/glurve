@@ -2,11 +2,10 @@ import game/game_shared_message.{type GameSharedMsg}
 import game/time
 import gleam/dict
 import gleam/erlang/process
-import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam_community/colour
+import gleam_community/colour as community_colour
 import gleam_community/maths
 import glubsub
 import lobby/lobby.{type LobbyMsg}
@@ -18,6 +17,7 @@ import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
+import player/colour
 import player/player.{tail_radius}
 import prng/seed.{type Seed}
 import shared_messages.{type AppSharedMsg}
@@ -463,14 +463,7 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
     player.tail
     |> list.map(fn(pos) {
       let #(x, y) = pos
-      svg.circle([
-        attribute.attribute("cx", float.to_string(x)),
-        attribute.attribute("cy", float.to_string(y)),
-        attribute.attribute("r", float.to_string(tail_radius)),
-        attribute.attribute("fill", colour.to_css_rgba_string(colour)),
-        attribute.attribute("stroke", "black"),
-        attribute.attribute("stroke-width", "0.02"),
-      ])
+      colour.to_svg_tail(colour, x, y, tail_radius)
     })
 
   // Draw a triangle "head" at (player.x, player.y) facing player.angle
@@ -492,43 +485,33 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
   let right_y =
     player.position.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
 
-  let points =
-    float.to_string(tip_x)
-    <> ","
-    <> float.to_string(tip_y)
-    <> " "
-    <> float.to_string(left_x)
-    <> ","
-    <> float.to_string(left_y)
-    <> " "
-    <> float.to_string(right_x)
-    <> ","
-    <> float.to_string(right_y)
-
   let head =
-    svg.polygon([
-      attribute.attribute("points", points),
-      attribute.attribute("fill", colour.to_css_rgba_string(colour)),
-      attribute.attribute("stroke", "black"),
-      attribute.attribute("stroke-width", "0.1"),
-    ])
+    colour.to_svg_head(colour, tip_x, tip_y, left_x, left_y, right_x, right_y)
 
-  let head_keyed = #("head", head)
+  let head_keyed = #("head-" <> colour.to_string(colour), head)
 
   let tail_points_len = list.length(tail_points)
   let tail_points_keyed =
     tail_points
     |> list.index_map(fn(pos, index) {
-      #("tail-" <> int.to_string(tail_points_len - index - 1), pos)
+      #(
+        "tail-"
+          <> colour.to_string(colour)
+          <> "-"
+          <> int.to_string(tail_points_len - index - 1),
+        pos,
+      )
     })
 
   [head_keyed, ..tail_points_keyed]
 }
 
 pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {
-  let countdown_colour = case colour.from_hsla(0.824, 0.73, 0.83, 0.15) {
+  let countdown_colour = case
+    community_colour.from_hsla(0.824, 0.73, 0.83, 0.15)
+  {
     Ok(c) -> c
-    Error(_) -> colour.black
+    Error(_) -> community_colour.black
   }
 
   let countdown_text =
@@ -540,7 +523,10 @@ pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {
         attribute.attribute("dominant-baseline", "middle"),
         attribute.attribute("font-size", "200"),
         attribute.attribute("font-family", "sans-serif"),
-        attribute.attribute("fill", colour.to_css_rgba_string(countdown_colour)),
+        attribute.attribute(
+          "fill",
+          community_colour.to_css_rgba_string(countdown_colour),
+        ),
       ],
       int.to_string(count),
     )
