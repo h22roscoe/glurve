@@ -19,8 +19,8 @@ gleam test  # Run the tests
 - [x] Ability to unready yourself in a lobby
 - [x] Add resizing game screen capability (based on num players mostly)
 - [ ] Player should be able to change their name
-- [ ] Player should be able to choose their colour
-- [ ] Colour should translate to game colour
+- [x] Player should be able to choose their colour
+- [x] Colour should translate to game colour
 - [x] Player status should reset to not ready on refresh
 - [ ] Player status should be in game while in game
 - [ ] Think of ways to add tests
