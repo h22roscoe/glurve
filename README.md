@@ -52,6 +52,7 @@ but specifying the Dockerfile location might be superfluous after the PR is in s
 - [ ] Think of ways to add tests
 - [ ] More diverse start positions
 - [ ] Highlighting of player during countdown
+- [ ] Clean up of rooms that are >1 day old
 - [ ] (Longer term) Multiple rounds in a game
 - [ ] (Longer term) Points per round and scoreboard display
 - [ ] (Longer term) Power ups in game
