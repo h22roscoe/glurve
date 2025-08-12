@@ -23,6 +23,11 @@ gleam test  # Run the tests
 - [x] Colour should translate to game colour
 - [x] Player status should reset to not ready on refresh
 - [x] Player status should be in game while in game
+- [ ] Colorful tail circles improved
+- [ ] Room search
+- [ ] (Longer term) Regional rooms
+- [ ] Join by code functionality
+- [ ] Private rooms
 - [ ] Think of ways to add tests
 - [ ] (Longer term) Multiple rounds in a game
 - [ ] (Longer term) Points per round and scoreboard display
