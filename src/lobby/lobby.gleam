@@ -243,7 +243,7 @@ fn handle_lobby_msg(
       let new_players =
         set.map(state.players, fn(p) {
           case p.id == player.id {
-            True -> Player(..p, colour: colour)
+            True -> Player(..p, colour: colour, status: NotReady)
             False -> p
           }
         })

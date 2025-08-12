@@ -184,10 +184,15 @@ fn update(model: AppModel, msg: AppMsg) -> #(AppModel, Effect(AppMsg)) {
     LobbyManagerMsg(l) -> update_lobby_manager_msg(model, l)
     LobbyMsg(l) -> update_lobby_msg(model, l)
     ChangingColour -> {
+      let open = !model.open_colour_picker
       #(
-        AppModel(..model, open_colour_picker: !model.open_colour_picker),
-        // TODO: Add effect to tell lobby that the player is picking a colour
-        effect.none(),
+        AppModel(..model, open_colour_picker: open),
+        effect.from(fn(dispatch) {
+          case open {
+            True -> dispatch(LobbyMsg(PlayerChangingColour(model.player)))
+            False -> Nil
+          }
+        }),
       )
     }
   }
@@ -324,7 +329,8 @@ fn update_lobby_shared_msg(
               ..lobby_info,
               players: set.map(lobby_info.players, fn(p) {
                 case p.id == player_id {
-                  True -> lobby.Player(..p, colour: colour)
+                  True ->
+                    lobby.Player(..p, colour: colour, status: lobby.NotReady)
                   False -> p
                 }
               }),
@@ -1096,7 +1102,10 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
           case we_are_host {
             True ->
               html.div(
-                [attribute.class("avatar"), event.on_click(ChangingColour)],
+                [
+                  attribute.class("avatar"),
+                  event.on_click(ChangingColour),
+                ],
                 [
                   svg.svg(
                     [
@@ -1186,15 +1195,16 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
       let other_players_list = {
         use player <- list.map(other_players)
         let is_us = player.id == model.player.id
-
         html.div([attribute.class("player")], [
           html.div(
             [
               attribute.class("avatar"),
-              case is_us {
-                True -> event.on_click(ChangingColour)
-                False -> attribute.none()
-              },
+              ..case is_us {
+                True -> [
+                  event.on_click(ChangingColour),
+                ]
+                False -> []
+              }
             ],
             [
               svg.svg(
