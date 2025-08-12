@@ -10,6 +10,7 @@ import prng/random
 import shared_messages.{
   type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
   LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady, PlayerExitedGame,
+  PlayerHasPickedColour, PlayerIsChangingColour,
 }
 
 pub type Player {
@@ -29,6 +30,8 @@ pub type LobbyMsg {
   LeaveLobby(player: Player)
   PlayerReady(player: Player)
   PlayerNotReady(player: Player)
+  PlayerChangingColour(player: Player)
+  PlayerPickedColour(player: Player, colour: colour.Colour)
   ExitGame(player: Player)
   GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
   GetLobbyInfo(reply_with: Subject(LobbyInfo))
@@ -221,6 +224,36 @@ fn handle_lobby_msg(
         )
       actor.continue(new_info)
     }
+    PlayerChangingColour(player) -> {
+      let new_players =
+        set.map(state.players, fn(p) {
+          case p.id == player.id {
+            True -> Player(..p, status: PickingColour)
+            False -> p
+          }
+        })
+      let assert Ok(_) =
+        glubsub.broadcast(
+          state.topic,
+          LobbySharedMsg(PlayerIsChangingColour(player.id)),
+        )
+      actor.continue(LobbyInfo(..state, players: new_players))
+    }
+    PlayerPickedColour(player, colour) -> {
+      let new_players =
+        set.map(state.players, fn(p) {
+          case p.id == player.id {
+            True -> Player(..p, colour: colour)
+            False -> p
+          }
+        })
+      let assert Ok(_) =
+        glubsub.broadcast(
+          state.topic,
+          LobbySharedMsg(PlayerHasPickedColour(player.id, colour)),
+        )
+      actor.continue(LobbyInfo(..state, players: new_players))
+    }
     ExitGame(player) -> {
       let new_players =
         set.map(state.players, fn(p) {
@@ -272,6 +305,18 @@ pub fn player_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
 
 pub fn player_not_ready(subject: Subject(LobbyMsg), player: Player) -> Nil {
   actor.send(subject, PlayerNotReady(player))
+}
+
+pub fn player_changing_colour(subject: Subject(LobbyMsg), player: Player) -> Nil {
+  actor.send(subject, PlayerChangingColour(player))
+}
+
+pub fn player_picked_colour(
+  subject: Subject(LobbyMsg),
+  player: Player,
+  colour: colour.Colour,
+) -> Nil {
+  actor.send(subject, PlayerPickedColour(player, colour))
 }
 
 pub fn exit_game(subject: Subject(LobbyMsg), player: Player) -> Nil {

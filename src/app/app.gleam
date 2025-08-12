@@ -1,3 +1,4 @@
+import colour_picker
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -11,7 +12,8 @@ import gleam/string
 import glubsub.{type Topic}
 import lobby/lobby.{
   type LobbyInfo, type LobbyMsg, CloseLobby, ExitGame, GetGameTopic,
-  GetLobbyInfo, JoinLobby, LeaveLobby, LobbyInfo, PlayerNotReady, PlayerReady,
+  GetLobbyInfo, JoinLobby, LeaveLobby, LobbyInfo, PlayerChangingColour,
+  PlayerNotReady, PlayerPickedColour, PlayerReady,
 }
 import lobby/lobby_manager.{
   type LobbyManagerMsg, CreateLobby, ListLobbies, RemoveLobby, SearchLobbies,
@@ -31,7 +33,8 @@ import shared_messages.{
   type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
   AllPlayersReady, LobbyClosed, LobbyCreated, LobbyJoined, LobbyLeft,
   LobbyManagerSharedMsg, LobbyRemoved, LobbySharedMsg, PlayerBecameNotReady,
-  PlayerBecameReady, PlayerExitedGame,
+  PlayerBecameReady, PlayerExitedGame, PlayerHasPickedColour,
+  PlayerIsChangingColour,
 }
 
 pub type StartArgs {
@@ -46,6 +49,7 @@ pub opaque type AppMsg {
   RecievedAppSharedMsg(AppSharedMsg(LobbyMsg))
   LobbyManagerMsg(LobbyManagerMsg)
   LobbyMsg(LobbyMsg)
+  ChangingColour
 }
 
 pub type AppState {
@@ -68,6 +72,7 @@ pub type AppModel {
     lobby_map_input: Option(String),
     lobby_mode_input: Option(String),
     lobby_region_input: Option(String),
+    open_colour_picker: Bool,
   )
 }
 
@@ -156,6 +161,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobby_map_input: None,
       lobby_mode_input: None,
       lobby_region_input: None,
+      open_colour_picker: False,
     )
 
   case info {
@@ -177,6 +183,13 @@ fn update(model: AppModel, msg: AppMsg) -> #(AppModel, Effect(AppMsg)) {
     RecievedAppSharedMsg(r) -> update_shared_msg(model, r)
     LobbyManagerMsg(l) -> update_lobby_manager_msg(model, l)
     LobbyMsg(l) -> update_lobby_msg(model, l)
+    ChangingColour -> {
+      #(
+        AppModel(..model, open_colour_picker: !model.open_colour_picker),
+        // TODO: Add effect to tell lobby that the player is picking a colour
+        effect.none(),
+      )
+    }
   }
 }
 
@@ -286,6 +299,32 @@ fn update_lobby_shared_msg(
               players: set.map(lobby_info.players, fn(p) {
                 case p.id == player_id {
                   True -> lobby.Player(..p, status: lobby.NotReady)
+                  False -> p
+                }
+              }),
+            )
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
+        }
+        PlayerIsChangingColour(player_id) -> {
+          let lobby_info =
+            LobbyInfo(
+              ..lobby_info,
+              players: set.map(lobby_info.players, fn(p) {
+                case p.id == player_id {
+                  True -> lobby.Player(..p, status: lobby.PickingColour)
+                  False -> p
+                }
+              }),
+            )
+          #(AppModel(..model, current_lobby: Some(lobby_info)), effect.none())
+        }
+        PlayerHasPickedColour(player_id, colour) -> {
+          let lobby_info =
+            LobbyInfo(
+              ..lobby_info,
+              players: set.map(lobby_info.players, fn(p) {
+                case p.id == player_id {
+                  True -> lobby.Player(..p, colour: colour)
                   False -> p
                 }
               }),
@@ -495,6 +534,37 @@ fn update_lobby_msg(
         None -> #(model, effect.none())
       }
     }
+    PlayerChangingColour(player) -> {
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(
+            model,
+            player_changing_colour_effect(
+              player,
+              lobby_info.name,
+              model.lobbies,
+            ),
+          )
+        }
+        None -> #(model, effect.none())
+      }
+    }
+    PlayerPickedColour(player, colour) -> {
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          #(
+            model,
+            player_picked_colour_effect(
+              player,
+              colour,
+              lobby_info.name,
+              model.lobbies,
+            ),
+          )
+        }
+        None -> #(model, effect.none())
+      }
+    }
     ExitGame(player) -> {
       case model.current_lobby {
         Some(lobby_info) -> {
@@ -561,6 +631,29 @@ fn player_not_ready_effect(
   use _dispatch <- effect.from
   let assert Ok(lobby) = dict.get(lobbies, lobby_id)
   lobby.player_not_ready(lobby.data, player)
+  Nil
+}
+
+fn player_changing_colour_effect(
+  player: lobby.Player,
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
+) {
+  use _dispatch <- effect.from
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.player_changing_colour(lobby.data, player)
+  Nil
+}
+
+fn player_picked_colour_effect(
+  player: lobby.Player,
+  colour: colour.Colour,
+  lobby_id: String,
+  lobbies: dict.Dict(String, Started(Subject(LobbyMsg))),
+) {
+  use _dispatch <- effect.from
+  let assert Ok(lobby) = dict.get(lobbies, lobby_id)
+  lobby.player_picked_colour(lobby.data, player, colour)
   Nil
 }
 
@@ -978,6 +1071,9 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
 }
 
 fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
+  let pick_colour_msg = fn(colour: colour.Colour) {
+    LobbyMsg(PlayerPickedColour(model.player, colour))
+  }
   let content = case model.current_lobby {
     None ->
       html.div([attribute.class("empty-state")], [
@@ -997,27 +1093,59 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
       let we_are_host = host.id == model.player.id
       let host_elem =
         html.div([attribute.class("player")], [
-          html.div([attribute.class("avatar")], [
-            svg.svg(
-              [
-                attribute.class("player-avatar"),
-                attribute.attribute("viewBox", "0 0 100 100"),
-                attribute.attribute("width", "24px"),
-                attribute.attribute("height", "24px"),
-              ],
-              [
-                colour.to_svg_head(
-                  host.colour,
-                  20.0,
-                  10.0,
-                  20.0,
-                  90.0,
-                  90.0,
-                  50.0,
+          case we_are_host {
+            True ->
+              html.div(
+                [attribute.class("avatar"), event.on_click(ChangingColour)],
+                [
+                  svg.svg(
+                    [
+                      attribute.class("player-avatar"),
+                      attribute.attribute("viewBox", "0 0 100 100"),
+                      attribute.attribute("width", "24px"),
+                      attribute.attribute("height", "24px"),
+                    ],
+                    [
+                      colour.to_svg_head(
+                        host.colour,
+                        20.0,
+                        10.0,
+                        20.0,
+                        90.0,
+                        90.0,
+                        50.0,
+                      ),
+                    ],
+                  ),
+                  colour_picker.colour_picker(
+                    model.open_colour_picker,
+                    pick_colour_msg,
+                  ),
+                ],
+              )
+            False ->
+              html.div([attribute.class("avatar")], [
+                svg.svg(
+                  [
+                    attribute.class("player-avatar"),
+                    attribute.attribute("viewBox", "0 0 100 100"),
+                    attribute.attribute("width", "24px"),
+                    attribute.attribute("height", "24px"),
+                  ],
+                  [
+                    colour.to_svg_head(
+                      host.colour,
+                      20.0,
+                      10.0,
+                      20.0,
+                      90.0,
+                      90.0,
+                      50.0,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ]),
+              ])
+          },
           html.div([], [
             html.h3([], [
               html.text(host.name),
@@ -1060,27 +1188,44 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
         let is_us = player.id == model.player.id
 
         html.div([attribute.class("player")], [
-          html.div([attribute.class("avatar")], [
-            svg.svg(
-              [
-                attribute.class("player-avatar"),
-                attribute.attribute("viewBox", "0 0 100 100"),
-                attribute.attribute("width", "24px"),
-                attribute.attribute("height", "24px"),
-              ],
-              [
-                colour.to_svg_head(
-                  player.colour,
-                  20.0,
-                  10.0,
-                  20.0,
-                  90.0,
-                  90.0,
-                  50.0,
-                ),
-              ],
-            ),
-          ]),
+          html.div(
+            [
+              attribute.class("avatar"),
+              case is_us {
+                True -> event.on_click(ChangingColour)
+                False -> attribute.none()
+              },
+            ],
+            [
+              svg.svg(
+                [
+                  attribute.class("player-avatar"),
+                  attribute.attribute("viewBox", "0 0 100 100"),
+                  attribute.attribute("width", "24px"),
+                  attribute.attribute("height", "24px"),
+                ],
+                [
+                  colour.to_svg_head(
+                    player.colour,
+                    20.0,
+                    10.0,
+                    20.0,
+                    90.0,
+                    90.0,
+                    50.0,
+                  ),
+                ],
+              ),
+              case is_us {
+                True ->
+                  colour_picker.colour_picker(
+                    model.open_colour_picker,
+                    pick_colour_msg,
+                  )
+                False -> element.none()
+              },
+            ],
+          ),
           html.div([], [
             html.h3([], [
               html.text(player.name),

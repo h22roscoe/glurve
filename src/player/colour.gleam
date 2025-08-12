@@ -17,6 +17,7 @@ pub type Colour {
   Lightning
   Lime
   Magenta
+  Melon
   Orange
   Pink
   Pirate
@@ -27,7 +28,6 @@ pub type Colour {
   Slate
   Spots
   Teal
-  Watermelon
   Yellow
 }
 
@@ -45,6 +45,7 @@ pub fn all() -> set.Set(Colour) {
     Lightning,
     Lime,
     Magenta,
+    Melon,
     Orange,
     Pink,
     Pirate,
@@ -55,7 +56,6 @@ pub fn all() -> set.Set(Colour) {
     Slate,
     Spots,
     Teal,
-    Watermelon,
     Yellow,
   ])
 }
@@ -74,6 +74,7 @@ pub fn to_string(colour: Colour) -> String {
     Lightning -> "Lightning"
     Lime -> "Lime"
     Magenta -> "Magenta"
+    Melon -> "Melon"
     Orange -> "Orange"
     Pink -> "Pink"
     Pirate -> "Pirate"
@@ -84,7 +85,6 @@ pub fn to_string(colour: Colour) -> String {
     Slate -> "Slate"
     Spots -> "Spots"
     Teal -> "Teal"
-    Watermelon -> "Watermelon"
     Yellow -> "Yellow"
   }
 }
@@ -211,6 +211,7 @@ fn colour_slug(colour: Colour) -> String {
     Lightning -> "lightning"
     Lime -> "lime"
     Magenta -> "magenta"
+    Melon -> "melon"
     Orange -> "orange"
     Pink -> "pink"
     Pirate -> "pirate"
@@ -221,7 +222,6 @@ fn colour_slug(colour: Colour) -> String {
     Slate -> "slate"
     Spots -> "spots"
     Teal -> "teal"
-    Watermelon -> "watermelon"
     Yellow -> "yellow"
   }
 }
