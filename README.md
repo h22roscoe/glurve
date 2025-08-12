@@ -22,7 +22,7 @@ gleam test  # Run the tests
 - [x] Player should be able to choose their colour
 - [x] Colour should translate to game colour
 - [x] Player status should reset to not ready on refresh
-- [ ] Player status should be in game while in game
+- [x] Player status should be in game while in game
 - [ ] Think of ways to add tests
 - [ ] (Longer term) Multiple rounds in a game
 - [ ] (Longer term) Points per round and scoreboard display
