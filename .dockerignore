@@ -1,0 +1,44 @@
+# flyctl launch added from .gitignore
+**/*.beam
+**/*.ez
+build
+**/erl_crash.dump
+
+**/**/.DS_Store
+
+# flyctl launch added from build/packages/filespy/.gitignore
+build/packages/filespy/**/*.beam
+build/packages/filespy/**/*.ez
+build/packages/filespy/**/build
+build/packages/filespy/**/erl_crash.dump
+
+# Devenv
+build/packages/filespy/**/.devenv*
+build/packages/filespy/**/devenv.local.nix
+
+# direnv
+build/packages/filespy/**/.direnv
+
+# pre-commit
+build/packages/filespy/**/.pre-commit-config.yaml
+
+build/packages/filespy/**/.devenv
+
+# flyctl launch added from build/packages/radiate/.gitignore
+build/packages/radiate/**/*.beam
+build/packages/radiate/**/*.ez
+build/packages/radiate/**/build
+build/packages/radiate/**/erl_crash.dump
+
+# Devenv
+build/packages/radiate/**/.devenv*
+build/packages/radiate/**/devenv.local.nix
+
+# direnv
+build/packages/radiate/**/.direnv
+
+# pre-commit
+build/packages/radiate/**/.pre-commit-config.yaml
+
+build/packages/radiate/**/.devenv
+fly.toml

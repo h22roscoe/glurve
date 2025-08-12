@@ -1,0 +1,1 @@
+docker build ../glurve -f ../glurve/.nixpacks/Dockerfile -t glurve --build-arg NIXPACKS_METADATA=gleam
