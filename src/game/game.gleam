@@ -56,7 +56,6 @@ pub type GameMsg {
   KeyUp(String)
   // Also acts as MouseDown
   TouchDown(TouchEvent)
-  TouchMove(TouchEvent)
   // Also acts as MouseUp
   TouchUp
   EndGame
@@ -402,10 +401,6 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       let new_players =
         handle_turn(model.players, model.player_id, turn_direction)
       #(Model(..model, players: new_players), broadcast_effect)
-    }
-
-    TouchMove(TouchEvent(client_x, client_y)) -> {
-      #(model, effect.none())
     }
 
     TouchUp -> {
