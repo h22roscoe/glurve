@@ -394,13 +394,18 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
         _ -> player.Straight
       }
 
-      let broadcast_msg =
-        game_shared_message.PlayerTurning(model.player_id, turn_direction)
-      let broadcast_effect = broadcast(model.topic, broadcast_msg)
+      case turn_direction {
+        t if t == player.turning -> #(model, effect.none())
+        _ -> {
+          let broadcast_msg =
+            game_shared_message.PlayerTurning(model.player_id, turn_direction)
+          let broadcast_effect = broadcast(model.topic, broadcast_msg)
 
-      let new_players =
-        handle_turn(model.players, model.player_id, turn_direction)
-      #(Model(..model, players: new_players), broadcast_effect)
+          let new_players =
+            handle_turn(model.players, model.player_id, turn_direction)
+          #(Model(..model, players: new_players), broadcast_effect)
+        }
+      }
     }
 
     TouchUp -> {
@@ -461,6 +466,17 @@ fn view(model: Model) -> Element(GameMsg) {
     })
 
   let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
+
+  let on_touch_move =
+    event.on("touchmove", {
+      use touches <- decode.field("touches", decode.list(of: touch_decoder()))
+      let first = list.first(touches)
+      case first {
+        Ok(touch_event) -> decode.success(TouchDown(touch_event))
+        Error(_) ->
+          decode.failure(NoOp, "Expected a list with at least one touch")
+      }
+    })
 
   let player_elements = list.flat_map(dict.values(model.players), draw_player)
 
@@ -546,6 +562,11 @@ fn view(model: Model) -> Element(GameMsg) {
     server_component.include(on_mouse_down, [
       "offsetX",
       "offsetY",
+      "currentTarget.height.animVal.value",
+      "currentTarget.width.animVal.value",
+    ]),
+    server_component.include(on_touch_move, [
+      "touches",
       "currentTarget.height.animVal.value",
       "currentTarget.width.animVal.value",
     ]),
