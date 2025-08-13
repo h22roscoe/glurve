@@ -58,7 +58,7 @@ fn colour_swatch(colour: colour.Colour, on_click: msg) -> element.Element(msg) {
             attribute.attribute("width", "24px"),
           ],
           [
-            colour.to_svg_head(colour, 20.0, 10.0, 20.0, 90.0, 90.0, 50.0),
+            colour.to_svg_head(colour, 90.0, 50.0, 20.0, 10.0, 20.0, 90.0),
           ],
         ),
         html.span([], [html.text(colour.to_string(colour))]),

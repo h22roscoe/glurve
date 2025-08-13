@@ -28,6 +28,7 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 import lustre/server_component
+import name_generator
 import player/colour
 import shared_messages.{
   type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
@@ -135,7 +136,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
     Error(_) ->
       lobby.Player(
         id: args.user_id,
-        name: "Anonymous player",
+        name: name_generator.generate_random_name(),
         colour: colour.Bee,
         status: lobby.NotReady,
       )
@@ -1124,12 +1125,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                     [
                       colour.to_svg_head(
                         host.colour,
+                        90.0,
+                        50.0,
                         20.0,
                         10.0,
                         20.0,
                         90.0,
-                        90.0,
-                        50.0,
                       ),
                     ],
                   ),
@@ -1151,12 +1152,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                   [
                     colour.to_svg_head(
                       host.colour,
+                      90.0,
+                      50.0,
                       20.0,
                       10.0,
                       20.0,
                       90.0,
-                      90.0,
-                      50.0,
                     ),
                   ],
                 ),
@@ -1224,12 +1225,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                 [
                   colour.to_svg_head(
                     player.colour,
+                    90.0,
+                    50.0,
                     20.0,
                     10.0,
                     20.0,
                     90.0,
-                    90.0,
-                    50.0,
                   ),
                 ],
               ),

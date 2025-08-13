@@ -32,4 +32,4 @@ wisp = ">= 1.8.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
-radiate = { git = "https://github.com/h22roscoe/gleam-radiate.git", ref = "735d957c76af6a654334432fe94fff6fcb748f91" }
+radiate = ">= 1.0.0 and < 2.0.0"
