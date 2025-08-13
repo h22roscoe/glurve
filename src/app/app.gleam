@@ -1125,12 +1125,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                     [
                       colour.to_svg_head(
                         host.colour,
+                        90.0,
+                        50.0,
                         20.0,
                         10.0,
                         20.0,
                         90.0,
-                        90.0,
-                        50.0,
                       ),
                     ],
                   ),
@@ -1152,12 +1152,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                   [
                     colour.to_svg_head(
                       host.colour,
+                      90.0,
+                      50.0,
                       20.0,
                       10.0,
                       20.0,
                       90.0,
-                      90.0,
-                      50.0,
                     ),
                   ],
                 ),
@@ -1225,12 +1225,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                 [
                   colour.to_svg_head(
                     player.colour,
+                    90.0,
+                    50.0,
                     20.0,
                     10.0,
                     20.0,
                     90.0,
-                    90.0,
-                    50.0,
                   ),
                 ],
               ),
