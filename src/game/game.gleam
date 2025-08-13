@@ -1,6 +1,7 @@
 import game/game_shared_message.{type GameSharedMsg}
 import game/time
 import gleam/dict
+import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/int
 import gleam/list
@@ -41,6 +42,10 @@ pub fn component() -> App(StartArgs, Model, GameMsg) {
   lustre.application(init, update, view)
 }
 
+pub type TouchEvent {
+  TouchEvent(client_x: Float, client_y: Float)
+}
+
 pub type GameMsg {
   RecievedSharedMsg(GameSharedMsg)
   NewTimer(time.TimerID)
@@ -49,6 +54,10 @@ pub type GameMsg {
   Tick
   KeyDown(String)
   KeyUp(String)
+  // Also acts as MouseDown
+  TouchDown(TouchEvent)
+  // Also acts as MouseUp
+  TouchUp
   EndGame
   NoOp
 }
@@ -93,6 +102,24 @@ fn subscribe(
     |> process.select_map(subject, handle_msg)
 
   selector
+}
+
+fn touch_decoder() -> decode.Decoder(TouchEvent) {
+  use client_x <- decode.field("offsetX", decode.int)
+  use client_y <- decode.field("offsetY", decode.int)
+  use height <- decode.subfield(
+    ["currentTarget", "height", "animVal", "value"],
+    decode.float,
+  )
+  use width <- decode.subfield(
+    ["currentTarget", "width", "animVal", "value"],
+    decode.float,
+  )
+  TouchEvent(
+    client_x: int.to_float(client_x) /. width,
+    client_y: int.to_float(client_y) /. height,
+  )
+  |> decode.success
 }
 
 fn compute_board_size(num_players: Int) -> Int {
@@ -339,6 +366,56 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
 
     KeyUp(_) -> #(model, effect.none())
 
+    TouchDown(TouchEvent(client_x, client_y)) -> {
+      let assert Ok(player) = dict.get(model.players, model.player_id)
+      let client_x = client_x *. int.to_float(model.board_width)
+      let client_y = client_y *. int.to_float(model.board_height)
+      let player_x = player.position.x
+      let player_y = player.position.y
+      let player_angle = player.angle
+
+      // Vector from player to touch
+      let dx = client_x -. player_x
+      let dy = client_y -. player_y
+
+      // Angle from player to touch point
+      let touch_angle = maths.atan2(dy, dx)
+
+      // Smallest signed angle difference (-pi, pi)
+      let angle_diff =
+        maths.atan2(
+          maths.sin(touch_angle -. player_angle),
+          maths.cos(touch_angle -. player_angle),
+        )
+
+      let turn_direction = case angle_diff {
+        _ if angle_diff >. 0.1 -> player.Right
+        _ if angle_diff <. -0.1 -> player.Left
+        _ -> player.Straight
+      }
+
+      let broadcast_msg =
+        game_shared_message.PlayerTurning(model.player_id, turn_direction)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
+
+      let new_players =
+        handle_turn(model.players, model.player_id, turn_direction)
+      #(Model(..model, players: new_players), broadcast_effect)
+    }
+
+    TouchUp -> {
+      let broadcast_msg =
+        game_shared_message.PlayerTurning(model.player_id, player.Straight)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
+      #(
+        Model(
+          ..model,
+          players: handle_turn(model.players, model.player_id, player.Straight),
+        ),
+        broadcast_effect,
+      )
+    }
+
     EndGame -> {
       #(model, effect.none())
     }
@@ -365,6 +442,25 @@ fn view(model: Model) -> Element(GameMsg) {
         _ -> NoOp
       }
     })
+
+  let on_touch_down =
+    event.on("touchdown", {
+      use touches <- decode.field("touches", decode.list(of: touch_decoder()))
+      let first = list.first(touches)
+      case first {
+        Ok(touch_event) -> decode.success(TouchDown(touch_event))
+        Error(_) ->
+          decode.failure(NoOp, "Expected a list with at least one touch")
+      }
+    })
+
+  let on_mouse_down =
+    event.on("mousedown", {
+      use touch_event <- decode.then(touch_decoder())
+      decode.success(TouchDown(touch_event))
+    })
+
+  let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
 
   let player_elements = list.flat_map(dict.values(model.players), draw_player)
 
@@ -441,6 +537,19 @@ fn view(model: Model) -> Element(GameMsg) {
     attribute.style("outline", "none!important"),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
+    server_component.include(on_touch_down, [
+      "touches",
+      "currentTarget.height.animVal.value",
+      "currentTarget.width.animVal.value",
+    ]),
+    on_touch_up,
+    server_component.include(on_mouse_down, [
+      "offsetX",
+      "offsetY",
+      "currentTarget.height.animVal.value",
+      "currentTarget.width.animVal.value",
+    ]),
+    event.on_mouse_up(TouchUp),
   ]
 
   element.fragment([
