@@ -453,21 +453,13 @@ fn view(model: Model) -> Element(GameMsg) {
           decode.failure(NoOp, "Expected a list with at least one touch")
       }
     })
+
   let on_mouse_down =
     event.on("mousedown", {
       use touch_event <- decode.then(touch_decoder())
       decode.success(TouchDown(touch_event))
     })
-  let on_touch_move =
-    event.on("touchmove", {
-      use touches <- decode.field("touches", decode.list(of: touch_decoder()))
-      let first = list.first(touches)
-      case first {
-        Ok(touch_event) -> decode.success(TouchDown(touch_event))
-        Error(_) ->
-          decode.failure(NoOp, "Expected a list with at least one touch")
-      }
-    })
+
   let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
 
   let player_elements = list.flat_map(dict.values(model.players), draw_player)
@@ -546,11 +538,6 @@ fn view(model: Model) -> Element(GameMsg) {
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
     server_component.include(on_touch_down, [
-      "touches",
-      "currentTarget.height.animVal.value",
-      "currentTarget.width.animVal.value",
-    ]),
-    server_component.include(on_touch_move, [
       "touches",
       "currentTarget.height.animVal.value",
       "currentTarget.width.animVal.value",
