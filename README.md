@@ -27,7 +27,7 @@ nixpacks build . --name glurve
 ```
 and deploying is currently:
 ```sh
-flyctl launch --dockerfile .nixpacks/Dockerfile
+flyctl deploy --dockerfile .nixpacks/Dockerfile
 ```
 but specifying the Dockerfile location might be superfluous after the PR is in since I will put it at the top level instead.
 
