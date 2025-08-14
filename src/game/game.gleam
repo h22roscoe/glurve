@@ -77,7 +77,6 @@ pub type Model {
     seed: Seed,
     board_width: Int,
     board_height: Int,
-    touch_held_down: Bool,
   )
 }
 
@@ -175,8 +174,6 @@ fn touch_decoder() -> decode.Decoder(TouchEvent) {
         }),
     ]),
   )
-  echo left as "left"
-  echo top as "top"
   use width <- decode.subfield(
     ["currentTarget", "width", "animVal", "value"],
     decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
@@ -223,7 +220,6 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
       seed: start_args.seed,
       board_width: board,
       board_height: board,
-      touch_held_down: False,
     )
 
   #(
