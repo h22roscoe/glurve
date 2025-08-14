@@ -3,6 +3,7 @@ import game/time
 import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -14,6 +15,7 @@ import lustre.{type App}
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
+import lustre/element/html
 import lustre/element/keyed
 import lustre/element/svg
 import lustre/event
@@ -105,23 +107,89 @@ fn subscribe(
   selector
 }
 
-fn touch_decoder() -> decode.Decoder(TouchEvent) {
+fn mouse_decoder() -> decode.Decoder(TouchEvent) {
   use buttons <- decode.optional_field("buttons", 1, decode.int)
   use client_x <- decode.field("offsetX", decode.int)
   use client_y <- decode.field("offsetY", decode.int)
   use height <- decode.subfield(
     ["currentTarget", "height", "animVal", "value"],
-    decode.float,
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
   )
   use width <- decode.subfield(
     ["currentTarget", "width", "animVal", "value"],
-    decode.float,
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
   )
 
   TouchEvent(
     client_x: int.to_float(client_x) /. width,
     client_y: int.to_float(client_y) /. height,
     pressed: buttons % 2 == 1,
+  )
+  |> decode.success
+}
+
+fn touch_decoder() -> decode.Decoder(TouchEvent) {
+  use client_x <- decode.subfield(
+    ["targetTouches", "0", "clientX"],
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+  )
+  use client_y <- decode.subfield(
+    ["targetTouches", "0", "clientY"],
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+  )
+  use left <- decode.subfield(
+    ["currentTarget", "attributes", "data-left-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
+  )
+  use top <- decode.subfield(
+    ["currentTarget", "attributes", "data-top-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
+  )
+  echo left as "left"
+  echo top as "top"
+  use width <- decode.subfield(
+    ["currentTarget", "width", "animVal", "value"],
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+  )
+  use height <- decode.subfield(
+    ["currentTarget", "height", "animVal", "value"],
+    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+  )
+
+  TouchEvent(
+    client_x: float.absolute_value({ client_x -. left }) /. width,
+    client_y: float.absolute_value({ client_y -. top }) /. height,
+    pressed: True,
   )
   |> decode.success
 }
@@ -460,35 +528,19 @@ fn view(model: Model) -> Element(GameMsg) {
       }
     })
 
-  let on_touch_down =
-    event.on("touchdown", {
-      use touches <- decode.field("touches", decode.list(of: touch_decoder()))
-      let first = list.first(touches)
-      case first {
-        Ok(touch_event) -> decode.success(TouchDown(touch_event))
-        Error(_) ->
-          decode.failure(NoOp, "Expected a list with at least one touch")
-      }
-    })
-
   let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
 
   let on_touch_move =
     event.on("touchmove", {
-      use touches <- decode.field("touches", decode.list(of: touch_decoder()))
-      let first = list.first(touches)
-      case first {
-        Ok(touch_event) -> decode.success(TouchDown(touch_event))
-        Error(_) ->
-          decode.failure(NoOp, "Expected a list with at least one touch")
-      }
+      use touch_event <- decode.then(touch_decoder())
+      decode.success(TouchDown(touch_event))
     })
     |> event.prevent_default()
     |> event.throttle(100)
 
   let on_mouse_move =
     event.on("mousemove", {
-      use touch_event <- decode.then(touch_decoder())
+      use touch_event <- decode.then(mouse_decoder())
       decode.success(TouchDown(touch_event))
     })
     |> event.prevent_default()
@@ -554,6 +606,7 @@ fn view(model: Model) -> Element(GameMsg) {
   }
 
   let svg_attributes = [
+    attribute.id("game-svg"),
     attribute.attribute(
       "viewBox",
       "0 0 "
@@ -569,11 +622,6 @@ fn view(model: Model) -> Element(GameMsg) {
     attribute.style("outline", "none!important"),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
-    server_component.include(on_touch_down, [
-      "touches",
-      "currentTarget.height.animVal.value",
-      "currentTarget.width.animVal.value",
-    ]),
     on_touch_up,
     server_component.include(on_mouse_move, [
       "offsetX",
@@ -583,7 +631,10 @@ fn view(model: Model) -> Element(GameMsg) {
       "currentTarget.width.animVal.value",
     ]),
     server_component.include(on_touch_move, [
-      "touches",
+      "targetTouches.0.clientX",
+      "targetTouches.0.clientY",
+      "currentTarget.attributes.data-left-vp.value",
+      "currentTarget.attributes.data-top-vp.value",
       "currentTarget.height.animVal.value",
       "currentTarget.width.animVal.value",
     ]),
@@ -595,6 +646,47 @@ fn view(model: Model) -> Element(GameMsg) {
       "svg",
       svg_attributes,
       svg_children,
+    ),
+    html.script(
+      [],
+      "
+(function () {
+  const el = document.querySelector('lustre-server-component').shadowRoot.querySelector('lustre-server-component').shadowRoot.querySelector('#game-svg');
+  if (!el) return;
+
+  function update() {
+    const r = el.getBoundingClientRect();
+    // viewport coords
+    el.setAttribute('data-left-vp', String(r.left));
+    el.setAttribute('data-top-vp',  String(r.top));
+    // page coords
+    el.setAttribute('data-left', String(r.left + window.scrollX));
+    el.setAttribute('data-top',  String(r.top  + window.scrollY));
+    console.log('el', el.attributes['data-left-vp'].value, el.attributes['data-top-vp'].value);
+  }
+
+  // Run once when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', update, { once: true });
+  } else {
+    update();
+  }
+
+  // Keep fresh on scroll/resize
+  window.addEventListener('scroll',  update, { passive: true });
+  window.addEventListener('resize',  update);
+
+  // If the SVG’s size/position can change due to content, observe it
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(update).observe(el);
+  }
+
+  // If transforms/layout change a lot, a rAF tick can keep it precise:
+  // let rafId;
+  // function tick(){ update(); rafId = requestAnimationFrame(tick); }
+  // tick();
+})();
+                    ",
     ),
   ])
 }
