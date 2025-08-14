@@ -4,7 +4,7 @@ version = "1.0.0"
 
 description = "This is a Gleam implementation of [Curve Fever](https://en.wikipedia.org/wiki/Achtung,_die_Kurve!)"
 
-licences = ["GPL-3.0-only"]
+licences = ["MIT"]
 
 repository = { type = "github", user = "h22roscoe", repo = "glurve" }
 
