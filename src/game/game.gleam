@@ -655,10 +655,6 @@ fn view(model: Model) -> Element(GameMsg) {
     // viewport coords
     el.setAttribute('data-left-vp', String(r.left));
     el.setAttribute('data-top-vp',  String(r.top));
-    // page coords
-    el.setAttribute('data-left', String(r.left + window.scrollX));
-    el.setAttribute('data-top',  String(r.top  + window.scrollY));
-    console.log('el', el.attributes['data-left-vp'].value, el.attributes['data-top-vp'].value);
   }
 
   // Run once when DOM is ready
@@ -672,7 +668,7 @@ fn view(model: Model) -> Element(GameMsg) {
   window.addEventListener('scroll',  update, { passive: true });
   window.addEventListener('resize',  update);
 
-  // If the SVG’s size/position can change due to content, observe it
+  // If the SVGs size/position can change due to content, observe it
   if ('ResizeObserver' in window) {
     new ResizeObserver(update).observe(el);
   }
@@ -681,8 +677,7 @@ fn view(model: Model) -> Element(GameMsg) {
   // let rafId;
   // function tick(){ update(); rafId = requestAnimationFrame(tick); }
   // tick();
-})();
-                    ",
+})();",
     ),
   ])
 }
