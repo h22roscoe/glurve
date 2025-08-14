@@ -43,7 +43,7 @@ pub fn component() -> App(StartArgs, Model, GameMsg) {
 }
 
 pub type TouchEvent {
-  TouchEvent(client_x: Float, client_y: Float)
+  TouchEvent(client_x: Float, client_y: Float, pressed: Bool)
 }
 
 pub type GameMsg {
@@ -75,6 +75,7 @@ pub type Model {
     seed: Seed,
     board_width: Int,
     board_height: Int,
+    touch_held_down: Bool,
   )
 }
 
@@ -105,6 +106,7 @@ fn subscribe(
 }
 
 fn touch_decoder() -> decode.Decoder(TouchEvent) {
+  use buttons <- decode.optional_field("buttons", 1, decode.int)
   use client_x <- decode.field("offsetX", decode.int)
   use client_y <- decode.field("offsetY", decode.int)
   use height <- decode.subfield(
@@ -115,9 +117,11 @@ fn touch_decoder() -> decode.Decoder(TouchEvent) {
     ["currentTarget", "width", "animVal", "value"],
     decode.float,
   )
+
   TouchEvent(
     client_x: int.to_float(client_x) /. width,
     client_y: int.to_float(client_y) /. height,
+    pressed: buttons % 2 == 1,
   )
   |> decode.success
 }
@@ -151,6 +155,7 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
       seed: start_args.seed,
       board_width: board,
       board_height: board,
+      touch_held_down: False,
     )
 
   #(
@@ -366,7 +371,7 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
 
     KeyUp(_) -> #(model, effect.none())
 
-    TouchDown(TouchEvent(client_x, client_y)) -> {
+    TouchDown(TouchEvent(client_x, client_y, True)) -> {
       let assert Ok(player) = dict.get(model.players, model.player_id)
       let client_x = client_x *. int.to_float(model.board_width)
       let client_y = client_y *. int.to_float(model.board_height)
@@ -408,17 +413,24 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
       }
     }
 
+    TouchDown(TouchEvent(_, _, False)) -> {
+      let assert Ok(player) = dict.get(model.players, model.player_id)
+      case player.turning {
+        player.Straight -> #(model, effect.none())
+        _ -> {
+          let broadcast_msg =
+            game_shared_message.PlayerTurning(model.player_id, player.Straight)
+          let broadcast_effect = broadcast(model.topic, broadcast_msg)
+
+          let new_players =
+            handle_turn(model.players, model.player_id, player.Straight)
+          #(Model(..model, players: new_players), broadcast_effect)
+        }
+      }
+    }
+
     TouchUp -> {
-      let broadcast_msg =
-        game_shared_message.PlayerTurning(model.player_id, player.Straight)
-      let broadcast_effect = broadcast(model.topic, broadcast_msg)
-      #(
-        Model(
-          ..model,
-          players: handle_turn(model.players, model.player_id, player.Straight),
-        ),
-        broadcast_effect,
-      )
+      #(model, effect.none())
     }
 
     EndGame -> {
@@ -459,12 +471,6 @@ fn view(model: Model) -> Element(GameMsg) {
       }
     })
 
-  let on_mouse_down =
-    event.on("mousedown", {
-      use touch_event <- decode.then(touch_decoder())
-      decode.success(TouchDown(touch_event))
-    })
-
   let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
 
   let on_touch_move =
@@ -477,6 +483,16 @@ fn view(model: Model) -> Element(GameMsg) {
           decode.failure(NoOp, "Expected a list with at least one touch")
       }
     })
+    |> event.prevent_default()
+    |> event.throttle(100)
+
+  let on_mouse_move =
+    event.on("mousemove", {
+      use touch_event <- decode.then(touch_decoder())
+      decode.success(TouchDown(touch_event))
+    })
+    |> event.prevent_default()
+    |> event.throttle(100)
 
   let player_elements = list.flat_map(dict.values(model.players), draw_player)
 
@@ -559,9 +575,10 @@ fn view(model: Model) -> Element(GameMsg) {
       "currentTarget.width.animVal.value",
     ]),
     on_touch_up,
-    server_component.include(on_mouse_down, [
+    server_component.include(on_mouse_move, [
       "offsetX",
       "offsetY",
+      "buttons",
       "currentTarget.height.animVal.value",
       "currentTarget.width.animVal.value",
     ]),
@@ -570,7 +587,6 @@ fn view(model: Model) -> Element(GameMsg) {
       "currentTarget.height.animVal.value",
       "currentTarget.width.animVal.value",
     ]),
-    event.on_mouse_up(TouchUp),
   ]
 
   element.fragment([
