@@ -139,6 +139,7 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
         name: name_generator.generate_random_name(),
         colour: colour.Bee,
         status: lobby.NotReady,
+        score: 0,
       )
   }
 
@@ -744,45 +745,36 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
           html.aside([attribute.class("sidebar")], [
             html.div([attribute.class("panel scoreboard")], [
               html.h3([], [html.text("Scoreboard")]),
-              html.div([attribute.class("score-row")], [
-                html.div(
-                  [
-                    attribute.class("swatch"),
-                    attribute.style("background", "#6be675"),
-                  ],
-                  [],
-                ),
-                html.div([], [html.text("Harry")]),
-                html.div([attribute.style("font-weight", "800")], [
-                  html.text("12"),
-                ]),
-              ]),
-              html.div([attribute.class("score-row")], [
-                html.div(
-                  [
-                    attribute.class("swatch"),
-                    attribute.style("background", "#58b3ff"),
-                  ],
-                  [],
-                ),
-                html.div([], [html.text("Ada")]),
-                html.div([attribute.style("font-weight", "800")], [
-                  html.text("9"),
-                ]),
-              ]),
-              html.div([attribute.class("score-row")], [
-                html.div(
-                  [
-                    attribute.class("swatch"),
-                    attribute.style("background", "#b48bff"),
-                  ],
-                  [],
-                ),
-                html.div([], [html.text("Lin")]),
-                html.div([attribute.style("font-weight", "800")], [
-                  html.text("5"),
-                ]),
-              ]),
+              ..{
+                use player <- list.map(set.to_list(lobby_info.players))
+                html.div([attribute.class("score-row")], [
+                  html.div([attribute.class("avatar")], [
+                    svg.svg(
+                      [
+                        attribute.class("player-avatar"),
+                        attribute.attribute("viewBox", "0 0 100 100"),
+                        attribute.attribute("width", "16px"),
+                        attribute.attribute("height", "16px"),
+                      ],
+                      [
+                        colour.to_svg_head(
+                          player.colour,
+                          90.0,
+                          50.0,
+                          20.0,
+                          10.0,
+                          20.0,
+                          90.0,
+                        ),
+                      ],
+                    ),
+                  ]),
+                  html.div([], [html.text(player.name)]),
+                  html.div([attribute.style("font-weight", "800")], [
+                    html.text(int.to_string(player.score)),
+                  ]),
+                ])
+              }
             ]),
             html.div([attribute.class("panel")], [
               html.h3([], [html.text("Match Options")]),

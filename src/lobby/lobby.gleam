@@ -14,7 +14,13 @@ import shared_messages.{
 }
 
 pub type Player {
-  Player(id: String, name: String, colour: colour.Colour, status: PlayerStatus)
+  Player(
+    id: String,
+    name: String,
+    colour: colour.Colour,
+    status: PlayerStatus,
+    score: Int,
+  )
 }
 
 pub type PlayerStatus {
