@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam_community/maths
@@ -17,6 +18,7 @@ pub type TurnDirection {
   Left
   Right
   Straight
+  Facing(x: Float, y: Float)
 }
 
 pub type Player {
@@ -103,12 +105,39 @@ pub fn update_speed(player: Player, speed: Float) -> Player {
   Player(..player, speed: speed)
 }
 
+fn normalize_angle(a: Float) -> Float {
+  // Maps to [-pi, pi]
+  maths.atan2(maths.sin(a), maths.cos(a))
+}
+
 /// Returns a new player with the updated position and tail based on a game tick.
 pub fn update(player: Player, height: Int, width: Int) -> Player {
   let angle = case player.turning {
     Left -> player.angle -. turn_rate
     Right -> player.angle +. turn_rate
     Straight -> player.angle
+    Facing(x, y) -> {
+      let dx = x *. int.to_float(width) -. player.position.x
+      let dy = y *. int.to_float(height) -. player.position.y
+
+      // If we're basically at the target, don't change angle
+      let dist2 = { dx *. dx } +. { dy *. dy }
+      case dist2 <. 1.0e-12 {
+        True -> player.angle
+        False -> {
+          let fx = maths.cos(player.angle)
+          let fy = maths.sin(player.angle)
+
+          let cross = fx *. dy -. fy *. dx
+          let dot = fx *. dx +. fy *. dy
+
+          // Smallest signed angle from forward to target in [-pi, pi]
+          let delta = maths.atan2(cross, dot)
+          let step = float.clamp(delta, float.negate(turn_rate), turn_rate)
+          normalize_angle(player.angle +. step)
+        }
+      }
+    }
   }
 
   let new_x = player.position.x +. maths.cos(angle) *. player.speed

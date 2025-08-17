@@ -56,11 +56,7 @@ pub type GameMsg {
   Tick
   KeyDown(String)
   KeyUp(String)
-  // Also acts as MouseDown
   TouchDown(TouchEvent)
-  // Also acts as MouseUp
-  TouchUp
-  EndGame
   NoOp
 }
 
@@ -111,12 +107,42 @@ fn mouse_decoder() -> decode.Decoder(TouchEvent) {
   use client_x <- decode.field("offsetX", decode.int)
   use client_y <- decode.field("offsetY", decode.int)
   use height <- decode.subfield(
-    ["currentTarget", "height", "animVal", "value"],
-    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+    ["currentTarget", "attributes", "data-height-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
   )
   use width <- decode.subfield(
-    ["currentTarget", "width", "animVal", "value"],
-    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+    ["currentTarget", "attributes", "data-width-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
   )
 
   TouchEvent(
@@ -175,17 +201,47 @@ fn touch_decoder() -> decode.Decoder(TouchEvent) {
     ]),
   )
   use width <- decode.subfield(
-    ["currentTarget", "width", "animVal", "value"],
-    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+    ["currentTarget", "attributes", "data-width-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
   )
   use height <- decode.subfield(
-    ["currentTarget", "height", "animVal", "value"],
-    decode.one_of(decode.float, [decode.int |> decode.map(int.to_float)]),
+    ["currentTarget", "attributes", "data-height-vp", "value"],
+    decode.one_of(decode.float, [
+      decode.int |> decode.map(int.to_float),
+      decode.string
+        |> decode.map(fn(s) {
+          case float.parse(s) {
+            Ok(f) -> f
+            Error(_) -> {
+              let int_attempt = int.parse(s)
+              case int_attempt {
+                Ok(i) -> int.to_float(i)
+                Error(_) -> 0.0
+              }
+            }
+          }
+        }),
+    ]),
   )
 
   TouchEvent(
-    client_x: float.absolute_value({ client_x -. left }) /. width,
-    client_y: float.absolute_value({ client_y -. top }) /. height,
+    client_x: float.max(0.0, { client_x -. left }) /. width,
+    client_y: float.max(0.0, { client_y -. top }) /. height,
     pressed: True,
   )
   |> decode.success
@@ -436,69 +492,23 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
     KeyUp(_) -> #(model, effect.none())
 
     TouchDown(TouchEvent(client_x, client_y, True)) -> {
-      let assert Ok(player) = dict.get(model.players, model.player_id)
-      let client_x = client_x *. int.to_float(model.board_width)
-      let client_y = client_y *. int.to_float(model.board_height)
-      let player_x = player.position.x
-      let player_y = player.position.y
-      let player_angle = player.angle
-
-      // Vector from player to touch
-      let dx = client_x -. player_x
-      let dy = client_y -. player_y
-
-      // Angle from player to touch point
-      let touch_angle = maths.atan2(dy, dx)
-
-      // Smallest signed angle difference (-pi, pi)
-      let angle_diff =
-        maths.atan2(
-          maths.sin(touch_angle -. player_angle),
-          maths.cos(touch_angle -. player_angle),
-        )
-
-      let turn_direction = case angle_diff {
-        _ if angle_diff >. 0.1 -> player.Right
-        _ if angle_diff <. -0.1 -> player.Left
-        _ -> player.Straight
-      }
-
-      case turn_direction {
-        t if t == player.turning -> #(model, effect.none())
-        _ -> {
-          let broadcast_msg =
-            game_shared_message.PlayerTurning(model.player_id, turn_direction)
-          let broadcast_effect = broadcast(model.topic, broadcast_msg)
-
-          let new_players =
-            handle_turn(model.players, model.player_id, turn_direction)
-          #(Model(..model, players: new_players), broadcast_effect)
-        }
-      }
+      let turn_direction = player.Facing(client_x, client_y)
+      let broadcast_msg =
+        game_shared_message.PlayerTurning(model.player_id, turn_direction)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
+      let new_players =
+        handle_turn(model.players, model.player_id, turn_direction)
+      #(Model(..model, players: new_players), broadcast_effect)
     }
 
     TouchDown(TouchEvent(_, _, False)) -> {
-      let assert Ok(player) = dict.get(model.players, model.player_id)
-      case player.turning {
-        player.Straight -> #(model, effect.none())
-        _ -> {
-          let broadcast_msg =
-            game_shared_message.PlayerTurning(model.player_id, player.Straight)
-          let broadcast_effect = broadcast(model.topic, broadcast_msg)
+      let broadcast_msg =
+        game_shared_message.PlayerTurning(model.player_id, player.Straight)
+      let broadcast_effect = broadcast(model.topic, broadcast_msg)
 
-          let new_players =
-            handle_turn(model.players, model.player_id, player.Straight)
-          #(Model(..model, players: new_players), broadcast_effect)
-        }
-      }
-    }
-
-    TouchUp -> {
-      #(model, effect.none())
-    }
-
-    EndGame -> {
-      #(model, effect.none())
+      let new_players =
+        handle_turn(model.players, model.player_id, player.Straight)
+      #(Model(..model, players: new_players), broadcast_effect)
     }
 
     NoOp -> #(model, effect.none())
@@ -523,8 +533,6 @@ fn view(model: Model) -> Element(GameMsg) {
         _ -> NoOp
       }
     })
-
-  let on_touch_up = event.on("touchup", { decode.success(TouchUp) })
 
   let on_touch_move =
     event.on("touchmove", {
@@ -618,21 +626,20 @@ fn view(model: Model) -> Element(GameMsg) {
     attribute.style("outline", "none!important"),
     server_component.include(on_key_down, ["key"]),
     server_component.include(on_key_up, ["key"]),
-    on_touch_up,
     server_component.include(on_mouse_move, [
       "offsetX",
       "offsetY",
       "buttons",
-      "currentTarget.height.animVal.value",
-      "currentTarget.width.animVal.value",
+      "currentTarget.attributes.data-height-vp.value",
+      "currentTarget.attributes.data-width-vp.value",
     ]),
     server_component.include(on_touch_move, [
       "targetTouches.0.clientX",
       "targetTouches.0.clientY",
       "currentTarget.attributes.data-left-vp.value",
       "currentTarget.attributes.data-top-vp.value",
-      "currentTarget.height.animVal.value",
-      "currentTarget.width.animVal.value",
+      "currentTarget.attributes.data-width-vp.value",
+      "currentTarget.attributes.data-height-vp.value",
     ]),
   ]
 
@@ -655,6 +662,8 @@ fn view(model: Model) -> Element(GameMsg) {
     // viewport coords
     el.setAttribute('data-left-vp', String(r.left));
     el.setAttribute('data-top-vp',  String(r.top));
+    el.setAttribute('data-width-vp',  String(r.width));
+    el.setAttribute('data-height-vp',  String(r.height));
   }
 
   // Run once when DOM is ready
