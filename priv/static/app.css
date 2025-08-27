@@ -506,3 +506,98 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* Base trail style (tweak these to taste) */
+.trail {
+  fill: none;
+  stroke-width: 6;             /* change globally if you like */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- Solid colour styles --- */
+.trail--blue    { stroke: #1E90FF; }
+.trail--cyan    { stroke: #00FFFF; }
+.trail--green   { stroke: #2ECC71; }
+.trail--ice     { stroke: #AEE6FF; filter: url(#glow-ice); }
+.trail--lime    { stroke: #A3FF12; }
+.trail--magenta { stroke: #FF3DBE; }
+.trail--orange  { stroke: #FF8C00; }
+.trail--pink    { stroke: #FF69B4; }
+.trail--purple  { stroke: #9B59B6; }
+.trail--red     { stroke: #FF3B30; }
+.trail--shark   { stroke: #4A6670; }   /* blue-grey */
+.trail--slate   { stroke: #708090; }   /* slate grey */
+.trail--teal    { stroke: #14B8A6; }
+.trail--yellow  { stroke: #FFD400; }
+
+/* --- Patterned / special styles --- */
+
+/* Bee: alternating yellow/black along the path */
+.trail--bee {
+  stroke: #000;
+}
+
+/* Camo: multi-green gradient for an earthy feel */
+.trail--camo {
+  stroke: url(#grad-camo);
+}
+
+/* Circuit: neon cyan with short dashes + glow */
+.trail--circuit {
+  stroke: #00FFF0;
+  filter: url(#glow-circuit);
+}
+
+/* Eye: hot red with glow, slight dash pulse */
+.trail--eye {
+  stroke: #2121f5;
+  filter: url(#glow-eye);
+  animation: dash-flow 2.4s linear infinite;
+}
+
+/* Galaxy: deep purple → teal gradient with soft glow */
+.trail--galaxy {
+  stroke: url(#grad-galaxy);
+  filter: url(#glow-galaxy);
+}
+
+/* Lightning: electric blue with bright outer glow + fast motion */
+.trail--lightning {
+  stroke: #000;
+  filter: url(#glow-lightning);
+}
+
+/* Melon: rind→flesh gradient (green→white→pink) */
+.trail--melon {
+  stroke: url(#grad-melon);
+}
+
+/* Pirate: near-black with tiny white flecks (subtle dashes) */
+.trail--pirate {
+  stroke: #111111;
+}
+
+/* Rainbow: full spectrum + gentle motion */
+.trail--rainbow {
+  stroke: url(#grad-rainbow);
+}
+
+/* Spots: dotted trail (round caps make dots) */
+.trail--spots {
+  stroke: #917154;
+}
+
+/* Orange/Green/etc above already handled; here are the themed ones left */
+.trail--lime     { stroke: #A3FF12; }
+.trail--orange   { stroke: #FF8C00; }
+.trail--pink     { stroke: #FF69B4; }
+.trail--purple   { stroke: #9B59B6; }
+.trail--red      { stroke: #FF3B30; }
+.trail--shark    { stroke: #4A6670; }
+.trail--slate    { stroke: #708090; }
+.trail--teal     { stroke: #14B8A6; }
+.trail--yellow   { stroke: #FFD400; }
+
+/* Optional: flowing dash animation used by some variants */
+@keyframes dash-flow { to { stroke-dashoffset: -1000; } }

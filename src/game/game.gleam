@@ -21,7 +21,7 @@ import lustre/element/svg
 import lustre/event
 import lustre/server_component
 import player/colour
-import player/player.{tail_radius}
+import player/player
 import prng/seed.{type Seed}
 import shared_messages.{type AppSharedMsg}
 
@@ -550,7 +550,8 @@ fn view(model: Model) -> Element(GameMsg) {
     |> event.prevent_default()
     |> event.throttle(100)
 
-  let player_elements = list.flat_map(dict.values(model.players), draw_player)
+  let drawn_players = list.flat_map(dict.values(model.players), draw_player)
+  let player_elements = list.append(colour.svg_defs(), drawn_players)
 
   let game_over_text_element =
     svg.text(
@@ -697,12 +698,8 @@ fn view(model: Model) -> Element(GameMsg) {
 /// new keyed elements.
 pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
   let colour = player.colour
-  let tail_points =
-    player.tail
-    |> list.map(fn(pos) {
-      let #(x, y) = pos
-      colour.to_svg_tail(colour, x, y, tail_radius)
-    })
+  let tail_poly = player.tail_polyline(player.tail, colour)
+  let tail_keyed = #("tail-" <> colour.to_string(colour), tail_poly)
 
   // Draw a triangle "head" at (player.x, player.y) facing player.angle
   let angle = player.angle
@@ -724,24 +721,11 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
     player.position.y +. maths.sin(right_angle) *. { head_size /. 1.5 }
 
   let head =
-    colour.to_svg_head(colour, tip_x, tip_y, left_x, left_y, right_x, right_y)
+    player.to_svg_head(colour, tip_x, tip_y, left_x, left_y, right_x, right_y)
 
   let head_keyed = #("head-" <> colour.to_string(colour), head)
 
-  let tail_points_len = list.length(tail_points)
-  let tail_points_keyed =
-    tail_points
-    |> list.index_map(fn(pos, index) {
-      #(
-        "tail-"
-          <> colour.to_string(colour)
-          <> "-"
-          <> int.to_string(tail_points_len - index - 1),
-        pos,
-      )
-    })
-
-  [head_keyed, ..tail_points_keyed]
+  [tail_keyed, head_keyed]
 }
 
 pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {
