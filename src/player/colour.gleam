@@ -93,9 +93,7 @@ pub fn to_tail_styles(colour: Colour) -> attribute.Attribute(a) {
 }
 
 pub fn to_svg_head_href(colour: Colour) -> String {
-  "/static/curve-fever-heads-and-tails/triangle_"
-  <> colour_slug(colour)
-  <> ".svg"
+  "/static/curve-fever-heads/triangle_" <> colour_slug(colour) <> ".svg"
 }
 
 pub fn svg_defs() -> List(#(String, element.Element(a))) {
