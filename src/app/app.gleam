@@ -30,6 +30,7 @@ import lustre/event
 import lustre/server_component
 import name_generator
 import player/colour
+import player/player
 import shared_messages.{
   type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
   AllPlayersReady, LobbyClosed, LobbyCreated, LobbyJoined, LobbyLeft,
@@ -1115,7 +1116,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                       attribute.attribute("height", "24px"),
                     ],
                     [
-                      colour.to_svg_head(
+                      player.to_svg_head(
                         host.colour,
                         90.0,
                         50.0,
@@ -1142,7 +1143,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                     attribute.attribute("height", "24px"),
                   ],
                   [
-                    colour.to_svg_head(
+                    player.to_svg_head(
                       host.colour,
                       90.0,
                       50.0,
@@ -1215,7 +1216,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
                   attribute.attribute("height", "24px"),
                 ],
                 [
-                  colour.to_svg_head(
+                  player.to_svg_head(
                     player.colour,
                     90.0,
                     50.0,

@@ -1,4 +1,3 @@
-import gleam/float
 import gleam/set
 import lustre/attribute
 import lustre/element
@@ -89,112 +88,275 @@ pub fn to_string(colour: Colour) -> String {
   }
 }
 
-pub fn to_svg_head(
-  colour: Colour,
-  tip_x: Float,
-  tip_y: Float,
-  left_x: Float,
-  left_y: Float,
-  right_x: Float,
-  right_y: Float,
-) -> element.Element(a) {
-  // Source triangle in the asset (viewBox 0 0 100 100):
-  // tip=(90,50), left=(20,10), right=(20,90)
-  let p0x = 90.0
-  let p0y = 50.0
-  let p1x = 20.0
-  let p1y = 10.0
-  let p2x = 20.0
-  let p2y = 90.0
-
-  let m00 = p1x -. p0x
-  let m01 = p2x -. p0x
-  let m10 = p1y -. p0y
-  let m11 = p2y -. p0y
-  let det = m00 *. m11 -. m01 *. m10
-
-  // Inverse of M
-  let inv00 = m11 /. det
-  let inv01 = 0.0 -. m01 /. det
-  let inv10 = 0.0 -. m10 /. det
-  let inv11 = m00 /. det
-
-  let n00 = left_x -. tip_x
-  let n01 = right_x -. tip_x
-  let n10 = left_y -. tip_y
-  let n11 = right_y -. tip_y
-
-  // A = N * inv(M)
-  let a = n00 *. inv00 +. n01 *. inv10
-  let c = n00 *. inv01 +. n01 *. inv11
-  let b = n10 *. inv00 +. n11 *. inv10
-  let d = n10 *. inv01 +. n11 *. inv11
-
-  // t = Q0 - A * P0
-  let e = tip_x -. a *. p0x -. c *. p0y
-  let f = tip_y -. b *. p0x -. d *. p0y
-
-  let matrix =
-    "matrix("
-    <> float.to_string(a)
-    <> " "
-    <> float.to_string(b)
-    <> " "
-    <> float.to_string(c)
-    <> " "
-    <> float.to_string(d)
-    <> " "
-    <> float.to_string(e)
-    <> " "
-    <> float.to_string(f)
-    <> ")"
-
-  let href =
-    "/static/curve-fever-heads-and-tails/triangle_"
-    <> colour_slug(colour)
-    <> ".svg"
-
-  svg.image([
-    attribute.attribute("href", href),
-    attribute.attribute("width", "100"),
-    attribute.attribute("height", "100"),
-    attribute.attribute("transform", matrix),
-  ])
+pub fn to_tail_styles(colour: Colour) -> attribute.Attribute(a) {
+  attribute.class("trail trail--" <> colour_slug(colour))
 }
 
-pub fn to_svg_tail(
-  colour: Colour,
-  x: Float,
-  y: Float,
-  tail_radius: Float,
-) -> element.Element(a) {
-  // Asset circle has center (50,50) and r=30 in a 100x100 viewBox.
-  // Scale so r maps to tail_radius, then translate so center maps to (x,y).
-  let s = tail_radius /. 30.0
-  let tx = x -. s *. 50.0
-  let ty = y -. s *. 50.0
-  let matrix =
-    "matrix("
-    <> float.to_string(s)
-    <> " 0 0 "
-    <> float.to_string(s)
-    <> " "
-    <> float.to_string(tx)
-    <> " "
-    <> float.to_string(ty)
-    <> ")"
+pub fn to_svg_head_href(colour: Colour) -> String {
+  "/static/curve-fever-heads/triangle_" <> colour_slug(colour) <> ".svg"
+}
 
-  let href =
-    "/static/curve-fever-heads-and-tails/circle_"
-    <> colour_slug(colour)
-    <> ".svg"
-
-  svg.image([
-    attribute.attribute("href", href),
-    attribute.attribute("width", "100"),
-    attribute.attribute("height", "100"),
-    attribute.attribute("transform", matrix),
-  ])
+pub fn svg_defs() -> List(#(String, element.Element(a))) {
+  [
+    #(
+      "defs",
+      svg.defs([], [
+        // Rainbow
+        svg.linear_gradient(
+          [
+            attribute.id("grad-rainbow"),
+            attribute.attribute("x1", "0%"),
+            attribute.attribute("y1", "0%"),
+            attribute.attribute("x2", "100%"),
+            attribute.attribute("y2", "0%"),
+            attribute.attribute("gradientUnits", "userSpaceOnUse"),
+          ],
+          [
+            svg.stop([
+              attribute.attribute("offset", "0%"),
+              attribute.attribute("stop-color", "#FF3B30"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "16%"),
+              attribute.attribute("stop-color", "#FF9500"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "33%"),
+              attribute.attribute("stop-color", "#FFD400"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "50%"),
+              attribute.attribute("stop-color", "#34C759"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "66%"),
+              attribute.attribute("stop-color", "#00C7BE"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "83%"),
+              attribute.attribute("stop-color", "#007AFF"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "100%"),
+              attribute.attribute("stop-color", "#AF52DE"),
+            ]),
+          ],
+        ),
+        // Camo
+        svg.linear_gradient(
+          [
+            attribute.id("grad-camo"),
+            attribute.attribute("x1", "0%"),
+            attribute.attribute("y1", "0%"),
+            attribute.attribute("x2", "100%"),
+            attribute.attribute("y2", "0%"),
+            attribute.attribute("gradientUnits", "userSpaceOnUse"),
+          ],
+          [
+            svg.stop([
+              attribute.attribute("offset", "0%"),
+              attribute.attribute("stop-color", "#3B5323"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "35%"),
+              attribute.attribute("stop-color", "#556B2F"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "70%"),
+              attribute.attribute("stop-color", "#6B8E23"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "100%"),
+              attribute.attribute("stop-color", "#3B5323"),
+            ]),
+          ],
+        ),
+        // Galaxy
+        svg.linear_gradient(
+          [
+            attribute.id("grad-galaxy"),
+            attribute.attribute("x1", "0%"),
+            attribute.attribute("y1", "0%"),
+            attribute.attribute("x2", "100%"),
+            attribute.attribute("y2", "0%"),
+            attribute.attribute("gradientUnits", "userSpaceOnUse"),
+          ],
+          [
+            svg.stop([
+              attribute.attribute("offset", "0%"),
+              attribute.attribute("stop-color", "#5A00FF"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "50%"),
+              attribute.attribute("stop-color", "#7A30FF"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "100%"),
+              attribute.attribute("stop-color", "#00D1FF"),
+            ]),
+          ],
+        ),
+        // Melon (green -> white -> pink)
+        svg.linear_gradient(
+          [
+            attribute.id("grad-melon"),
+            attribute.attribute("x1", "50%"),
+            attribute.attribute("y1", "0%"),
+            attribute.attribute("x2", "50%"),
+            attribute.attribute("y2", "100%"),
+            attribute.attribute("gradientUnits", "userSpaceOnUse"),
+          ],
+          [
+            svg.stop([
+              attribute.attribute("offset", "0%"),
+              attribute.attribute("stop-color", "#2ECC71"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "35%"),
+              attribute.attribute("stop-color", "#9EF0B3"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "50%"),
+              attribute.attribute("stop-color", "#FFFFFF"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "65%"),
+              attribute.attribute("stop-color", "#FFD1DC"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "100%"),
+              attribute.attribute("stop-color", "#FF6B6B"),
+            ]),
+          ],
+        ),
+        // Eye
+        svg.linear_gradient(
+          [
+            attribute.id("grad-eye"),
+            attribute.attribute("x1", "0%"),
+            attribute.attribute("y1", "0%"),
+            attribute.attribute("x2", "100%"),
+            attribute.attribute("y2", "100%"),
+            attribute.attribute("gradientUnits", "userSpaceOnUse"),
+          ],
+          [
+            svg.stop([
+              attribute.attribute("offset", "0%"),
+              attribute.attribute("stop-color", "#FFFFFF"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "30%"),
+              attribute.attribute("stop-color", "#2035aaff"),
+            ]),
+            svg.stop([
+              attribute.attribute("offset", "100%"),
+              attribute.attribute("stop-color", "#0cd3e1ff"),
+            ]),
+          ],
+        ),
+        // Glow galaxy
+        svg.filter(
+          [
+            attribute.id("glow-galaxy"),
+            attribute.attribute("x", "-50%"),
+            attribute.attribute("y", "-50%"),
+            attribute.attribute("width", "200%"),
+            attribute.attribute("height", "200%"),
+          ],
+          [
+            svg.fe_gaussian_blur([
+              attribute.attribute("stdDeviation", "2.5"),
+              attribute.attribute("result", "blur"),
+            ]),
+            svg.fe_merge([], [
+              svg.fe_merge_node([attribute.attribute("in", "blur")]),
+              svg.fe_merge_node([attribute.attribute("in", "SourceGraphic")]),
+            ]),
+          ],
+        ),
+        // Glow lightning
+        svg.filter(
+          [
+            attribute.id("glow-lightning"),
+            attribute.attribute("x", "-60%"),
+            attribute.attribute("y", "-60%"),
+            attribute.attribute("width", "220%"),
+            attribute.attribute("height", "220%"),
+          ],
+          [
+            svg.fe_gaussian_blur([
+              attribute.attribute("stdDeviation", "4"),
+              attribute.attribute("result", "blur"),
+            ]),
+            svg.fe_merge([], [
+              svg.fe_merge_node([attribute.attribute("in", "blur")]),
+              svg.fe_merge_node([attribute.attribute("in", "SourceGraphic")]),
+            ]),
+          ],
+        ),
+        // Glow circuit
+        svg.filter(
+          [
+            attribute.id("glow-circuit"),
+            attribute.attribute("x", "-50%"),
+            attribute.attribute("y", "-50%"),
+            attribute.attribute("width", "200%"),
+            attribute.attribute("height", "200%"),
+          ],
+          [
+            svg.fe_gaussian_blur([
+              attribute.attribute("stdDeviation", "2"),
+              attribute.attribute("result", "blur"),
+            ]),
+            svg.fe_merge([], [
+              svg.fe_merge_node([attribute.attribute("in", "blur")]),
+              svg.fe_merge_node([attribute.attribute("in", "SourceGraphic")]),
+            ]),
+          ],
+        ),
+        // Glow eye
+        svg.filter(
+          [
+            attribute.id("glow-eye"),
+            attribute.attribute("x", "-50%"),
+            attribute.attribute("y", "-50%"),
+            attribute.attribute("width", "200%"),
+            attribute.attribute("height", "200%"),
+          ],
+          [
+            svg.fe_gaussian_blur([
+              attribute.attribute("stdDeviation", "3"),
+              attribute.attribute("result", "blur"),
+            ]),
+            svg.fe_merge([], [
+              svg.fe_merge_node([attribute.attribute("in", "blur")]),
+              svg.fe_merge_node([attribute.attribute("in", "SourceGraphic")]),
+            ]),
+          ],
+        ),
+        // Glow ice
+        svg.filter(
+          [
+            attribute.id("glow-ice"),
+            attribute.attribute("x", "-50%"),
+            attribute.attribute("y", "-50%"),
+            attribute.attribute("width", "200%"),
+            attribute.attribute("height", "200%"),
+          ],
+          [
+            svg.fe_gaussian_blur([
+              attribute.attribute("stdDeviation", "1.4"),
+              attribute.attribute("result", "blur"),
+            ]),
+            svg.fe_merge([], [
+              svg.fe_merge_node([attribute.attribute("in", "blur")]),
+              svg.fe_merge_node([attribute.attribute("in", "SourceGraphic")]),
+            ]),
+          ],
+        ),
+      ]),
+    ),
+  ]
 }
 
 fn colour_slug(colour: Colour) -> String {
