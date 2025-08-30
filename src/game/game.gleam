@@ -78,7 +78,7 @@ pub type Model {
 
 pub type GameState {
   Countdown(Int)
-  Playing
+  Playing(tick: Int)
   Crashed
   Ended
 }
@@ -393,7 +393,11 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
         Countdown(count) ->
           case count {
             1 -> #(
-              Model(..model, game_state: Playing, players: players_with_speed),
+              Model(
+                ..model,
+                game_state: Playing(tick: 0),
+                players: players_with_speed,
+              ),
               cancel_timer(model.countdown_timer),
             )
             _ -> #(
@@ -408,9 +412,14 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
     RecievedSharedMsg(shared_msg) -> handle_shared_msg(model, shared_msg)
 
     Tick -> {
+      let tick = case model.game_state {
+        Playing(t) -> t
+        _ -> 0
+      }
+
       let new_players =
         dict.map_values(model.players, fn(_, p) {
-          player.update(p, model.board_height, model.board_width)
+          player.update(p, tick, model.board_height, model.board_width)
         })
       let assert Ok(this_player) = dict.get(new_players, model.player_id)
       let player_collided_with_self =
@@ -435,8 +444,16 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
           player.Player(..this_player, speed: 0.0),
         )
 
+      let new_state = case model.game_state {
+        Playing(tick) -> Playing(tick + 1)
+        _ -> model.game_state
+      }
+
       case player_collided {
-        False -> #(Model(..model, players: new_players), effect.none())
+        False -> #(
+          Model(..model, game_state: new_state, players: new_players),
+          effect.none(),
+        )
         _ -> #(
           Model(..model, players: new_players_with_crashed, game_state: Crashed),
           broadcast(
@@ -698,8 +715,13 @@ fn view(model: Model) -> Element(GameMsg) {
 /// new keyed elements.
 pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
   let colour = player.colour
-  let tail_poly = player.tail_polyline(player.tail, colour)
-  let tail_keyed = #("tail-" <> colour.to_string(colour), tail_poly)
+  let tail_polys =
+    player.tail |> list.map(fn(p) { player.tail_polyline(p, colour) })
+  let tail_keyed =
+    tail_polys
+    |> list.index_map(fn(poly, i) {
+      #("tail-" <> colour.to_string(colour) <> int.to_string(i), poly)
+    })
 
   // Draw a triangle "head" at (player.x, player.y) facing player.angle
   let angle = player.angle
@@ -725,7 +747,7 @@ pub fn draw_player(player: player.Player) -> List(#(String, Element(GameMsg))) {
 
   let head_keyed = #("head-" <> colour.to_string(colour), head)
 
-  [tail_keyed, head_keyed]
+  list.append(tail_keyed, [head_keyed])
 }
 
 pub fn draw_countdown(count: Int) -> List(#(String, Element(GameMsg))) {

@@ -14,7 +14,7 @@ import glubsub.{type Topic}
 import lobby/lobby.{type LobbyMsg}
 import lobby/lobby_manager.{type LobbyManagerMsg}
 import mist
-import player/player.{Player, Straight}
+import player/player.{Player, Solid, Straight}
 import position
 import prng/seed.{type Seed}
 import radiate
@@ -136,6 +136,8 @@ fn serve_game_ws(
           angle: 0.0,
           tail: [],
           turning: Straight,
+          gap_state: Solid(0),
+          seed: seed.random(),
         )
       dict.insert(acc, player.id, player)
     })

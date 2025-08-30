@@ -9,6 +9,8 @@ import lustre/element
 import lustre/element/svg
 import player/colour
 import position.{type Position}
+import prng/random
+import prng/seed
 
 pub const tail_radius = 3.0
 
@@ -25,6 +27,11 @@ pub type TurnDirection {
   Facing(x: Float, y: Float)
 }
 
+pub type GapState {
+  Gapping(until_tick: Int)
+  Solid(next_gap_tick: Int)
+}
+
 pub type Player {
   Player(
     id: String,
@@ -32,8 +39,10 @@ pub type Player {
     position: Position,
     speed: Float,
     angle: Float,
-    tail: List(#(Float, Float)),
+    tail: List(List(#(Float, Float))),
     turning: TurnDirection,
+    seed: seed.Seed,
+    gap_state: GapState,
   )
 }
 
@@ -46,6 +55,7 @@ pub fn check_collision_with_self(player: Player) -> Bool {
     0.0 -> False
     _ ->
       player.tail
+      |> list.flatten()
       |> list.drop(tail_collision_grace_segments)
       |> list.any(fn(pos) {
         let #(tail_x, tail_y) = pos
@@ -88,7 +98,9 @@ pub fn check_collision_with_other_players(
     let distance_squared = dx *. dx +. dy *. dy
     let head_on_collision = distance_squared <. tail_radius *. tail_radius
     let tail_collision =
-      list.any(p.tail, fn(pos) {
+      p.tail
+      |> list.flatten()
+      |> list.any(fn(pos) {
         let #(tail_x, tail_y) = pos
         let dx = player.position.x -. tail_x
         let dy = player.position.y -. tail_y
@@ -114,8 +126,43 @@ fn normalize_angle(a: Float) -> Float {
   maths.atan2(maths.sin(a), maths.cos(a))
 }
 
+/// A random generator that produces the number of ticks the gap should be gapping for.
+fn gap_for_generator() -> random.Generator(Int) {
+  random.int(30, 80)
+}
+
+/// A random generator that produces the number of ticks until the next gap.
+fn solid_for_generator() -> random.Generator(Int) {
+  random.int(150, 500)
+}
+
+fn advance_gap_state(
+  gap_state: GapState,
+  seed: seed.Seed,
+  tick: Int,
+) -> #(GapState, seed.Seed) {
+  case gap_state {
+    Gapping(until_tick) ->
+      case tick >= until_tick {
+        True -> {
+          let #(solid_for, next_seed) = random.step(solid_for_generator(), seed)
+          #(Solid(tick + solid_for), next_seed)
+        }
+        False -> #(gap_state, seed)
+      }
+    Solid(next_gap_tick) ->
+      case tick >= next_gap_tick {
+        True -> {
+          let #(gap_for, next_seed) = random.step(gap_for_generator(), seed)
+          #(Gapping(tick + gap_for), next_seed)
+        }
+        False -> #(gap_state, seed)
+      }
+  }
+}
+
 /// Returns a new player with the updated position and tail based on a game tick.
-pub fn update(player: Player, height: Int, width: Int) -> Player {
+pub fn update(player: Player, tick: Int, height: Int, width: Int) -> Player {
   let angle = case player.turning {
     Left -> player.angle -. turn_rate
     Right -> player.angle +. turn_rate
@@ -151,13 +198,42 @@ pub fn update(player: Player, height: Int, width: Int) -> Player {
 
   let wrapped_y = wrap(new_y, height)
 
-  let new_tail = [#(player.position.x, player.position.y), ..player.tail]
+  let #(gap_state, next_seed) =
+    advance_gap_state(player.gap_state, player.seed, tick)
+
+  // Build the tail based on the NEW gap_state. We want to:
+  // - Add points while Solid is active
+  // - Start a NEW segment when transitioning from Gapping -> Solid
+  // - Do NOTHING while Gapping
+  let new_tail = case gap_state {
+    // While gapping we don't draw
+    Gapping(_) -> player.tail
+
+    // While solid we either continue the current segment or start a new one
+    Solid(_) ->
+      case player.gap_state {
+        // Stayed solid: add the current head position to the current segment
+        Solid(_) ->
+          case player.tail {
+            [head, ..rest] -> {
+              let new_head = [#(player.position.x, player.position.y), ..head]
+              [new_head, ..rest]
+            }
+            [] -> [[#(player.position.x, player.position.y)]]
+          }
+
+        // Transitioned from gapping -> solid: start a NEW segment at current position
+        Gapping(_) -> [[#(player.position.x, player.position.y)], ..player.tail]
+      }
+  }
 
   case player.speed {
     0.0 -> Player(..player, angle: angle)
     _ ->
       Player(
         ..player,
+        gap_state: gap_state,
+        seed: next_seed,
         position: position.Position(x: wrapped_x, y: wrapped_y),
         angle: angle,
         tail: new_tail,
