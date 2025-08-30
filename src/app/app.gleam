@@ -17,7 +17,7 @@ import lobby/lobby.{
 }
 import lobby/lobby_manager.{
   type LobbyManagerMsg, CreateLobby, ListLobbies, RemoveLobby, SearchLobbies,
-  UpdateLobbyMap, UpdateLobbyMaxPlayers, UpdateLobbyMode, UpdateLobbyName,
+  UpdateLobbyMaxPlayers, UpdateLobbyMode, UpdateLobbyModeX, UpdateLobbyName,
   UpdateLobbyRegion,
 }
 import lustre.{type App}
@@ -32,11 +32,11 @@ import name_generator
 import player/colour
 import player/player
 import shared_messages.{
-  type AppSharedMsg, type LobbyManagerSharedMsg, type LobbySharedMsg,
-  AllPlayersReady, LobbyClosed, LobbyCreated, LobbyJoined, LobbyLeft,
-  LobbyManagerSharedMsg, LobbyRemoved, LobbySharedMsg, PlayerBecameNotReady,
-  PlayerBecameReady, PlayerExitedGame, PlayerHasPickedColour,
-  PlayerIsChangingColour,
+  type AppSharedMsg, type GameLifecycleSharedMsg, type LobbyManagerSharedMsg,
+  type LobbySharedMsg, AllPlayersReady, GameLifecycleSharedMsg, LobbyClosed,
+  LobbyCreated, LobbyJoined, LobbyLeft, LobbyManagerSharedMsg, LobbyRemoved,
+  LobbySharedMsg, MatchEnded, PlayerBecameNotReady, PlayerBecameReady,
+  PlayerExitedGame, PlayerHasPickedColour, PlayerIsChangingColour, RoundEnded,
 }
 
 pub type StartArgs {
@@ -71,8 +71,8 @@ pub type AppModel {
     lobby_search_input: Option(String),
     lobby_name_input: Option(String),
     lobby_max_players_input: Option(Int),
-    lobby_map_input: Option(String),
     lobby_mode_input: Option(String),
+    lobby_mode_x_input: Option(Int),
     lobby_region_input: Option(String),
     open_colour_picker: Bool,
   )
@@ -161,8 +161,8 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
       lobby_search_input: None,
       lobby_name_input: None,
       lobby_max_players_input: None,
-      lobby_map_input: None,
       lobby_mode_input: None,
+      lobby_mode_x_input: None,
       lobby_region_input: None,
       open_colour_picker: False,
     )
@@ -173,7 +173,11 @@ fn init(args: StartArgs) -> #(AppModel, Effect(AppMsg)) {
         model,
         effect.batch([
           subscribe(args.topic, RecievedAppSharedMsg),
-          player_not_ready_effect(player, lobby_info.name, model.lobbies),
+          player_not_ready_effect(
+            player,
+            lobby_info.settings.name,
+            model.lobbies,
+          ),
         ]),
       )
     }
@@ -208,6 +212,7 @@ fn update_shared_msg(
   case msg {
     LobbyManagerSharedMsg(l) -> update_lobby_manager_shared_msg(model, l)
     LobbySharedMsg(l) -> update_lobby_shared_msg(model, l)
+    GameLifecycleSharedMsg(g) -> update_game_lifecycle_shared_msg(model, g)
   }
 }
 
@@ -254,7 +259,9 @@ fn update_lobby_shared_msg(
     }
     Some(lobby_info) -> {
       case msg {
-        LobbyJoined(_player_id, lobby_id) if lobby_id == lobby_info.name -> {
+        LobbyJoined(_player_id, lobby_id)
+          if lobby_id == lobby_info.settings.name
+        -> {
           // A player joined the lobby we are in so refresh the lobby info from source
           let assert Ok(lobby) = dict.get(model.lobbies, lobby_id)
           let lobby_info = lobby.get_lobby_info(lobby.data)
@@ -386,7 +393,7 @@ fn update_lobby_shared_msg(
           )
         }
         LobbyClosed -> {
-          let lobbies = dict.delete(model.lobbies, lobby_info.name)
+          let lobbies = dict.delete(model.lobbies, lobby_info.settings.name)
           #(
             AppModel(
               ..model,
@@ -408,7 +415,7 @@ fn update_lobby_manager_msg(
 ) -> #(AppModel, Effect(AppMsg)) {
   let lobby_manager = model.lobby_manager
   case msg {
-    CreateLobby(name, host_id, max_players, map, mode, region) -> {
+    CreateLobby(name, host_id, max_players, mode, region) -> {
       case name == "" {
         True -> #(model, effect.none())
         False -> #(
@@ -418,7 +425,6 @@ fn update_lobby_manager_msg(
             name,
             host_id,
             max_players,
-            map,
             mode,
             region,
           ),
@@ -453,14 +459,28 @@ fn update_lobby_manager_msg(
         effect.none(),
       )
     }
-    UpdateLobbyMap(map) -> {
-      #(AppModel(..model, lobby_map_input: Some(map)), effect.none())
-    }
     UpdateLobbyMode(mode) -> {
       #(AppModel(..model, lobby_mode_input: Some(mode)), effect.none())
     }
+    UpdateLobbyModeX(x) -> {
+      #(AppModel(..model, lobby_mode_x_input: Some(x)), effect.none())
+    }
     UpdateLobbyRegion(region) -> {
       #(AppModel(..model, lobby_region_input: Some(region)), effect.none())
+    }
+  }
+}
+
+fn update_game_lifecycle_shared_msg(
+  model: AppModel,
+  msg: GameLifecycleSharedMsg,
+) -> #(AppModel, Effect(AppMsg)) {
+  case msg {
+    RoundEnded -> {
+      todo
+    }
+    MatchEnded -> {
+      todo
     }
   }
 }
@@ -470,8 +490,7 @@ fn create_lobby_effect(
   name: String,
   host_id: String,
   max_players: Int,
-  map: String,
-  mode: String,
+  mode: lobby.GameMode,
   region: String,
 ) {
   use _dispatch <- effect.from
@@ -480,7 +499,6 @@ fn create_lobby_effect(
     name,
     host_id,
     max_players,
-    map,
     mode,
     region,
   )
@@ -510,14 +528,25 @@ fn update_lobby_msg(
             True -> #(
               model,
               effect.batch([
-                leave_lobby_effect(player, lobby_info.name, model.lobbies),
-                close_lobby_effect(lobby_info.name, model.lobbies),
-                remove_lobby_effect(model.lobby_manager, lobby_info.name),
+                leave_lobby_effect(
+                  player,
+                  lobby_info.settings.name,
+                  model.lobbies,
+                ),
+                close_lobby_effect(lobby_info.settings.name, model.lobbies),
+                remove_lobby_effect(
+                  model.lobby_manager,
+                  lobby_info.settings.name,
+                ),
               ]),
             )
             False -> #(
               model,
-              leave_lobby_effect(player, lobby_info.name, model.lobbies),
+              leave_lobby_effect(
+                player,
+                lobby_info.settings.name,
+                model.lobbies,
+              ),
             )
           }
         }
@@ -527,7 +556,10 @@ fn update_lobby_msg(
     PlayerReady(player) -> {
       case model.current_lobby {
         Some(lobby_info) -> {
-          #(model, player_ready_effect(player, lobby_info.name, model.lobbies))
+          #(
+            model,
+            player_ready_effect(player, lobby_info.settings.name, model.lobbies),
+          )
         }
         None -> #(model, effect.none())
       }
@@ -537,7 +569,11 @@ fn update_lobby_msg(
         Some(lobby_info) -> {
           #(
             model,
-            player_not_ready_effect(player, lobby_info.name, model.lobbies),
+            player_not_ready_effect(
+              player,
+              lobby_info.settings.name,
+              model.lobbies,
+            ),
           )
         }
         None -> #(model, effect.none())
@@ -550,7 +586,7 @@ fn update_lobby_msg(
             model,
             player_changing_colour_effect(
               player,
-              lobby_info.name,
+              lobby_info.settings.name,
               model.lobbies,
             ),
           )
@@ -566,7 +602,7 @@ fn update_lobby_msg(
             player_picked_colour_effect(
               player,
               colour,
-              lobby_info.name,
+              lobby_info.settings.name,
               model.lobbies,
             ),
           )
@@ -577,7 +613,10 @@ fn update_lobby_msg(
     ExitGame(player) -> {
       case model.current_lobby {
         Some(lobby_info) -> {
-          #(model, exit_game_effect(player, lobby_info.name, model.lobbies))
+          #(
+            model,
+            exit_game_effect(player, lobby_info.settings.name, model.lobbies),
+          )
         }
         None -> #(model, effect.none())
       }
@@ -591,7 +630,7 @@ fn update_lobby_msg(
     CloseLobby -> {
       case model.current_lobby {
         Some(lobby_info) -> {
-          #(model, close_lobby_effect(lobby_info.name, model.lobbies))
+          #(model, close_lobby_effect(lobby_info.settings.name, model.lobbies))
         }
         None -> #(model, effect.none())
       }
@@ -712,6 +751,14 @@ fn update_lobby_max_players(max_players: String) -> AppMsg {
   ))
 }
 
+fn update_lobby_mode(mode: String) -> AppMsg {
+  LobbyManagerMsg(UpdateLobbyMode(mode))
+}
+
+fn update_lobby_mode_x(x: String) -> AppMsg {
+  LobbyManagerMsg(UpdateLobbyModeX(int.base_parse(x, 10) |> result.unwrap(5)))
+}
+
 fn view_game(model: AppModel) -> Element(AppMsg) {
   case model.current_lobby {
     Some(lobby_info) ->
@@ -735,7 +782,11 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
                   ],
                   [
                     server_component.element(
-                      [server_component.route("/ws/" <> lobby_info.name)],
+                      [
+                        server_component.route(
+                          "/ws/" <> lobby_info.settings.name,
+                        ),
+                      ],
                       [],
                     ),
                   ],
@@ -875,7 +926,7 @@ fn view_lobby_list(model: AppModel) -> Element(AppMsg) {
                 "Players: "
                 <> int.to_string(set.size(lobby_state.players))
                 <> "/"
-                <> int.to_string(lobby_state.max_players)
+                <> int.to_string(lobby_state.settings.max_players)
                 <> " • Status: "
                 <> lobby.status_to_string(lobby_state.status),
               ),
@@ -890,7 +941,7 @@ fn view_lobby_list(model: AppModel) -> Element(AppMsg) {
             [
               html.span([attribute.class("pill")], [html.text("EU")]),
               case model.current_lobby {
-                Some(lobby_info) if lobby_info.name == lobby_id ->
+                Some(lobby_info) if lobby_info.settings.name == lobby_id ->
                   html.span([attribute.class("pill")], [html.text("Joined")])
                 _ ->
                   html.button(
@@ -965,7 +1016,7 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
           html.label([attribute.for("room-name")], [html.text("Room name")]),
           html.input([
             attribute.id("room-name"),
-            attribute.placeholder("e.g., Harry's Room"),
+            attribute.placeholder("e.g., Bob's Room"),
             attribute.type_("text"),
             attribute.required(True),
             attribute.value(model.lobby_name_input |> option.unwrap("")),
@@ -986,9 +1037,23 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
       ]),
       html.div([attribute.class("field")], [
         html.label([attribute.for("mode")], [html.text("Mode")]),
-        html.select([attribute.id("mode")], [
-          html.option([], "Points"),
-          html.option([], "Last Stand"),
+        html.select([attribute.id("mode"), event.on_change(update_lobby_mode)], [
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_input |> option.unwrap("Points") == "Points",
+              ),
+            ],
+            "Points",
+          ),
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_input |> option.unwrap("Points") == "Rounds",
+              ),
+            ],
+            "Rounds",
+          ),
         ]),
       ]),
     ]),
@@ -1027,11 +1092,42 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
         ),
       ]),
       html.div([attribute.class("field")], [
-        html.label([attribute.for("map")], [html.text("Map")]),
-        html.select([attribute.id("map")], [
-          html.option([], "Classic"),
-          html.option([], "Tight"),
-          html.option([], "Wide"),
+        html.label([attribute.for("x"), event.on_change(update_lobby_mode_x)], [
+          html.text("Num rounds / Target Points"),
+        ]),
+        html.select([attribute.id("x")], [
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_x_input |> option.unwrap(5) == 1,
+              ),
+            ],
+            "1",
+          ),
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_x_input |> option.unwrap(5) == 3,
+              ),
+            ],
+            "3",
+          ),
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_x_input |> option.unwrap(5) == 5,
+              ),
+            ],
+            "5",
+          ),
+          html.option(
+            [
+              attribute.selected(
+                model.lobby_mode_x_input |> option.unwrap(5) == 10,
+              ),
+            ],
+            "10",
+          ),
         ]),
       ]),
     ]),
@@ -1061,8 +1157,7 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
                     name,
                     model.player.id,
                     model.lobby_max_players_input |> option.unwrap(4),
-                    model.lobby_map_input |> option.unwrap(""),
-                    model.lobby_mode_input |> option.unwrap(""),
+                    parse_game_mode(model),
                     model.lobby_region_input |> option.unwrap(""),
                   )),
                 )
@@ -1295,7 +1390,7 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
           ],
           [
             html.div([attribute.style("font-weight", "800")], [
-              html.text("Room: " <> lobby_info.name),
+              html.text("Room: " <> lobby_info.settings.name),
             ]),
             html.div([attribute.class("pill")], [
               html.text("Room Code: " <> lobby_info.code),
@@ -1308,4 +1403,12 @@ fn view_lobby_players(model: AppModel) -> Element(AppMsg) {
   }
 
   html.div([attribute.class("panel room-players")], [content])
+}
+
+fn parse_game_mode(model: AppModel) -> lobby.GameMode {
+  case model.lobby_mode_input, model.lobby_mode_x_input {
+    Some("Points"), Some(x) -> lobby.FirstToXPoints(x)
+    Some("Rounds"), Some(x) -> lobby.HighestScoreAfterXRounds(x)
+    _, _ -> lobby.HighestScoreAfterXRounds(5)
+  }
 }

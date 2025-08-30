@@ -4,6 +4,7 @@ import gleam/dict
 import gleam/erlang/process.{type Selector, type Subject}
 import gleam/json
 import gleam/option.{type Option, Some}
+import gleam/otp/actor
 import glubsub
 import lobby/lobby.{type LobbyMsg}
 import lustre
@@ -29,7 +30,7 @@ pub type GameSocketInit =
 pub fn init(
   _,
   user_id: String,
-  lobby_id: String,
+  lobby_subject: actor.Started(process.Subject(LobbyMsg)),
   app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
   topic: glubsub.Topic(game_shared_message.GameSharedMsg),
   players: dict.Dict(String, player.Player),
@@ -40,7 +41,14 @@ pub fn init(
   let assert Ok(component) =
     lustre.start_server_component(
       game,
-      game.StartArgs(lobby_id:, user_id:, app_topic:, topic:, players:, seed:),
+      game.StartArgs(
+        lobby_subject:,
+        user_id:,
+        app_topic:,
+        topic:,
+        players:,
+        seed:,
+      ),
     )
 
   let self = process.new_subject()

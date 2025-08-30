@@ -30,8 +30,7 @@ pub type LobbyManagerMsg {
     name: String,
     host_id: String,
     max_players: Int,
-    map: String,
-    mode: String,
+    mode: lobby.GameMode,
     region: String,
   )
   RemoveLobby(name: String)
@@ -41,8 +40,8 @@ pub type LobbyManagerMsg {
   SearchLobbies(search: String)
   UpdateLobbyName(name: String)
   UpdateLobbyMaxPlayers(max_players: Int)
-  UpdateLobbyMap(map: String)
   UpdateLobbyMode(mode: String)
+  UpdateLobbyModeX(x: Int)
   UpdateLobbyRegion(region: String)
 }
 
@@ -51,9 +50,9 @@ fn handle_lobby_manager_msg(
   msg: LobbyManagerMsg,
 ) -> actor.Next(LobbyManagerState, LobbyManagerMsg) {
   case msg {
-    CreateLobby(name, host_id, max_players, map, mode, region) -> {
+    CreateLobby(name, host_id, max_players, mode, region) -> {
       let lobby =
-        lobby.start(name, host_id, max_players, map, mode, region, state.topic)
+        lobby.start(name, host_id, max_players, mode, region, state.topic)
       let assert Ok(_) =
         glubsub.broadcast(
           state.topic,
@@ -88,10 +87,10 @@ fn handle_lobby_manager_msg(
     UpdateLobbyMaxPlayers(_max_players) -> {
       actor.continue(state)
     }
-    UpdateLobbyMap(_map) -> {
+    UpdateLobbyMode(_mode) -> {
       actor.continue(state)
     }
-    UpdateLobbyMode(_mode) -> {
+    UpdateLobbyModeX(_x) -> {
       actor.continue(state)
     }
     UpdateLobbyRegion(_region) -> {
@@ -105,14 +104,10 @@ pub fn create_lobby(
   name: String,
   host_id: String,
   max_players: Int,
-  map: String,
-  mode: String,
+  mode: lobby.GameMode,
   region: String,
 ) -> Nil {
-  process.send(
-    subject,
-    CreateLobby(name, host_id, max_players, map, mode, region),
-  )
+  process.send(subject, CreateLobby(name, host_id, max_players, mode, region))
 }
 
 pub fn remove_lobby(subject: Subject(LobbyManagerMsg), name: String) -> Nil {

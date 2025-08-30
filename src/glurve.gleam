@@ -147,7 +147,7 @@ fn serve_game_ws(
     on_init: game_socket.init(
       _,
       user_id,
-      lobby_id,
+      l,
       app_topic,
       game_topic,
       players,

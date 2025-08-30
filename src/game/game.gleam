@@ -7,6 +7,7 @@ import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/otp/actor
 import gleam_community/colour as community_colour
 import gleam_community/maths
 import glubsub
@@ -31,7 +32,7 @@ const tick_delay_ms = 10
 
 pub type StartArgs {
   StartArgs(
-    lobby_id: String,
+    lobby_subject: actor.Started(process.Subject(LobbyMsg)),
     app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
     user_id: String,
     topic: glubsub.Topic(GameSharedMsg),
@@ -62,7 +63,7 @@ pub type GameMsg {
 
 pub type Model {
   Model(
-    lobby_id: String,
+    lobby_subject: actor.Started(process.Subject(LobbyMsg)),
     app_topic: glubsub.Topic(AppSharedMsg(LobbyMsg)),
     topic: glubsub.Topic(GameSharedMsg),
     game_state: GameState,
@@ -265,7 +266,7 @@ fn init(start_args: StartArgs) -> #(Model, Effect(GameMsg)) {
   let board = compute_board_size(num_players)
   let model =
     Model(
-      lobby_id: start_args.lobby_id,
+      lobby_subject: start_args.lobby_subject,
       app_topic: start_args.app_topic,
       topic: start_args.topic,
       game_state: Countdown(3),

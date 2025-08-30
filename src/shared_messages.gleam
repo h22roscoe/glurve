@@ -5,6 +5,7 @@ import player/colour
 pub type AppSharedMsg(m) {
   LobbyManagerSharedMsg(LobbyManagerSharedMsg(m))
   LobbySharedMsg(LobbySharedMsg)
+  GameLifecycleSharedMsg(GameLifecycleSharedMsg)
 }
 
 pub type LobbyManagerSharedMsg(m) {
@@ -22,4 +23,9 @@ pub type LobbySharedMsg {
   AllPlayersReady
   PlayerExitedGame(player_id: String)
   LobbyClosed
+}
+
+pub type GameLifecycleSharedMsg {
+  RoundEnded
+  MatchEnded
 }

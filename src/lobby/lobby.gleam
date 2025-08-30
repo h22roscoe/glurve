@@ -44,17 +44,22 @@ pub type LobbyMsg {
   CloseLobby
 }
 
+pub type GameMode {
+  FirstToXPoints(points: Int)
+  HighestScoreAfterXRounds(rounds: Int)
+}
+
+pub type LobbySettings {
+  LobbySettings(name: String, max_players: Int, mode: GameMode, region: String)
+}
+
 pub type LobbyInfo {
   LobbyInfo(
     code: String,
-    name: String,
+    settings: LobbySettings,
     players: Set(Player),
-    max_players: Int,
     status: LobbyStatus,
     host_id: String,
-    map: String,
-    mode: String,
-    region: String,
     topic: Topic(AppSharedMsg(LobbyMsg)),
     game_topic: Topic(GameSharedMsg),
   )
@@ -70,8 +75,7 @@ pub fn start(
   name: String,
   host_id: String,
   max_players: Int,
-  map: String,
-  mode: String,
+  mode: GameMode,
   region: String,
   topic: Topic(AppSharedMsg(LobbyMsg)),
 ) -> Started(Subject(LobbyMsg)) {
@@ -79,14 +83,10 @@ pub fn start(
   let state =
     LobbyInfo(
       room_code(),
-      name,
+      LobbySettings(name, max_players, mode, region),
       set.new(),
-      max_players,
       Waiting,
       host_id,
-      map,
-      mode,
-      region,
       topic,
       game_topic,
     )
@@ -120,7 +120,7 @@ fn handle_lobby_msg(
   msg: LobbyMsg,
 ) -> actor.Next(LobbyInfo, LobbyMsg) {
   case msg {
-    JoinLobby(player, lobby_id) if lobby_id == state.name -> {
+    JoinLobby(player, lobby_id) if lobby_id == state.settings.name -> {
       let used_colours =
         state.players
         |> set.to_list()
@@ -144,10 +144,10 @@ fn handle_lobby_msg(
           let assert Ok(_) =
             glubsub.broadcast(
               state.topic,
-              LobbySharedMsg(LobbyJoined(new_player.id, state.name)),
+              LobbySharedMsg(LobbyJoined(new_player.id, state.settings.name)),
             )
           case num_players {
-            _ if num_players >= state.max_players -> {
+            _ if num_players >= state.settings.max_players -> {
               actor.continue(LobbyInfo(..new_info, status: Full))
             }
             _ -> actor.continue(new_info)
@@ -162,7 +162,7 @@ fn handle_lobby_msg(
     LeaveLobby(player) -> {
       let is_host = player.id == state.host_id
       let new_players = set.delete(state.players, player)
-      let new_status = case set.size(new_players) < state.max_players {
+      let new_status = case set.size(new_players) < state.settings.max_players {
         True -> Waiting
         False -> state.status
       }
