@@ -758,7 +758,7 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
                         attribute.attribute("height", "16px"),
                       ],
                       [
-                        colour.to_svg_head(
+                        player.to_svg_head(
                           player.colour,
                           90.0,
                           50.0,
