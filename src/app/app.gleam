@@ -13,7 +13,7 @@ import glubsub.{type Topic}
 import lobby/lobby.{
   type LobbyInfo, type LobbyMsg, CloseLobby, ExitGame, GetGameTopic,
   GetLobbyInfo, JoinLobby, LeaveLobby, LobbyInfo, PlayerChangingColour,
-  PlayerNotReady, PlayerPickedColour, PlayerReady,
+  PlayerCrashed, PlayerNotReady, PlayerPickedColour, PlayerReady,
 }
 import lobby/lobby_manager.{
   type LobbyManagerMsg, CreateLobby, ListLobbies, RemoveLobby, SearchLobbies,
@@ -35,8 +35,8 @@ import shared_messages.{
   type AppSharedMsg, type GameLifecycleSharedMsg, type LobbyManagerSharedMsg,
   type LobbySharedMsg, AllPlayersReady, GameLifecycleSharedMsg, LobbyClosed,
   LobbyCreated, LobbyJoined, LobbyLeft, LobbyManagerSharedMsg, LobbyRemoved,
-  LobbySharedMsg, MatchEnded, PlayerBecameNotReady, PlayerBecameReady,
-  PlayerExitedGame, PlayerHasPickedColour, PlayerIsChangingColour, RoundEnded,
+  LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady, PlayerExitedGame,
+  PlayerHasPickedColour, PlayerIsChangingColour, RoundEnded,
 }
 
 pub type StartArgs {
@@ -384,7 +384,7 @@ fn update_lobby_shared_msg(
           let lobby_info =
             LobbyInfo(
               ..lobby_info,
-              status: lobby.Playing,
+              status: lobby.Playing(1, set.new()),
               players: players_in_game,
             )
           #(
@@ -477,10 +477,54 @@ fn update_game_lifecycle_shared_msg(
 ) -> #(AppModel, Effect(AppMsg)) {
   case msg {
     RoundEnded -> {
-      todo
-    }
-    MatchEnded -> {
-      todo
+      case model.current_lobby {
+        Some(lobby_info) -> {
+          case lobby_info.settings.mode {
+            lobby.FirstToXPoints(x) -> {
+              let players_reached_score =
+                set.filter(lobby_info.players, fn(p) { p.score >= x })
+              case set.size(players_reached_score) > 0 {
+                True -> {
+                  let lobby_info =
+                    LobbyInfo(..lobby_info, status: lobby.Finished)
+                  #(
+                    AppModel(..model, current_lobby: Some(lobby_info)),
+                    effect.none(),
+                  )
+                }
+                False -> {
+                  let new_round = case lobby_info.status {
+                    lobby.Playing(round, _dead_players) -> round + 1
+                    _ -> 1
+                  }
+                  let new_status = lobby.Playing(new_round, set.new())
+                  let lobby_info = LobbyInfo(..lobby_info, status: new_status)
+                  #(
+                    AppModel(..model, current_lobby: Some(lobby_info)),
+                    effect.none(),
+                  )
+                }
+              }
+            }
+            lobby.HighestScoreAfterXRounds(rounds) -> {
+              let new_round = case lobby_info.status {
+                lobby.Playing(round, _dead_players) -> round + 1
+                _ -> 1
+              }
+              let new_status = case new_round > rounds {
+                True -> lobby.Finished
+                False -> lobby.Playing(new_round, set.new())
+              }
+              let lobby_info = LobbyInfo(..lobby_info, status: new_status)
+              #(
+                AppModel(..model, current_lobby: Some(lobby_info)),
+                effect.none(),
+              )
+            }
+          }
+        }
+        None -> #(model, effect.none())
+      }
     }
   }
 }
@@ -621,12 +665,9 @@ fn update_lobby_msg(
         None -> #(model, effect.none())
       }
     }
-    GetGameTopic(_) -> {
-      #(model, effect.none())
-    }
-    GetLobbyInfo(_) -> {
-      #(model, effect.none())
-    }
+    PlayerCrashed(_) -> #(model, effect.none())
+    GetGameTopic(_) -> #(model, effect.none())
+    GetLobbyInfo(_) -> #(model, effect.none())
     CloseLobby -> {
       case model.current_lobby {
         Some(lobby_info) -> {
@@ -765,7 +806,9 @@ fn view_game(model: AppModel) -> Element(AppMsg) {
       html.div([attribute.class("container")], [
         html.div([attribute.id("game"), attribute.class("screen")], [
           html.div([attribute.class("hud")], [
-            html.div([attribute.class("stat")], [html.text("Round 1/5")]),
+            html.div([attribute.class("stat")], [
+              html.text(lobby.mode_progress(lobby_info)),
+            ]),
             html.div([attribute.class("stat")], [html.text("Speed x1.0")]),
             html.div([attribute.class("stat")], [html.text("Gaps: On")]),
             html.div([attribute.class("stat")], [html.text("Ping: 24ms")]),
@@ -1092,10 +1135,10 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
         ),
       ]),
       html.div([attribute.class("field")], [
-        html.label([attribute.for("x"), event.on_change(update_lobby_mode_x)], [
+        html.label([attribute.for("x")], [
           html.text("Num rounds / Target Points"),
         ]),
-        html.select([attribute.id("x")], [
+        html.select([attribute.id("x"), event.on_change(update_lobby_mode_x)], [
           html.option(
             [
               attribute.selected(
@@ -1151,7 +1194,7 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
               None -> attribute.disabled(True)
             },
             case model.lobby_name_input {
-              Some(name) if name != "" ->
+              Some(name) if name != "" -> {
                 event.on_click(
                   LobbyManagerMsg(CreateLobby(
                     name,
@@ -1161,6 +1204,7 @@ fn view_create_join_form(model: AppModel) -> Element(AppMsg) {
                     model.lobby_region_input |> option.unwrap(""),
                   )),
                 )
+              }
               Some(_) -> attribute.none()
               None -> attribute.none()
             },

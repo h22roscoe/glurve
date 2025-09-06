@@ -1,5 +1,6 @@
 import game/game_shared_message.{type GameSharedMsg}
 import gleam/erlang/process.{type Subject}
+import gleam/int
 import gleam/list
 import gleam/otp/actor.{type Started}
 import gleam/set.{type Set}
@@ -8,9 +9,10 @@ import gluid
 import player/colour
 import prng/random
 import shared_messages.{
-  type AppSharedMsg, AllPlayersReady, LobbyClosed, LobbyJoined, LobbyLeft,
-  LobbySharedMsg, PlayerBecameNotReady, PlayerBecameReady, PlayerExitedGame,
-  PlayerHasPickedColour, PlayerIsChangingColour,
+  type AppSharedMsg, AllPlayersReady, GameLifecycleSharedMsg, LobbyClosed,
+  LobbyJoined, LobbyLeft, LobbySharedMsg, PlayerBecameNotReady,
+  PlayerBecameReady, PlayerExitedGame, PlayerHasPickedColour,
+  PlayerIsChangingColour, RoundEnded,
 }
 
 pub type Player {
@@ -39,6 +41,7 @@ pub type LobbyMsg {
   PlayerChangingColour(player: Player)
   PlayerPickedColour(player: Player, colour: colour.Colour)
   ExitGame(player: Player)
+  PlayerCrashed(player_id: String)
   GetGameTopic(reply_with: Subject(Topic(GameSharedMsg)))
   GetLobbyInfo(reply_with: Subject(LobbyInfo))
   CloseLobby
@@ -68,7 +71,8 @@ pub type LobbyInfo {
 pub type LobbyStatus {
   Waiting
   Full
-  Playing
+  Playing(round: Int, dead_players: Set(Player))
+  Finished
 }
 
 pub fn start(
@@ -101,7 +105,8 @@ pub fn status_to_string(status: LobbyStatus) -> String {
   case status {
     Waiting -> "Waiting"
     Full -> "Full"
-    Playing -> "Playing"
+    Playing(_round, _dead) -> "Playing"
+    Finished -> "Finished"
   }
 }
 
@@ -201,7 +206,11 @@ fn handle_lobby_msg(
           let players_in_game =
             set.map(new_players, fn(p) { Player(..p, status: InGame) })
           let new_state =
-            LobbyInfo(..state, players: players_in_game, status: Playing)
+            LobbyInfo(
+              ..state,
+              players: players_in_game,
+              status: Playing(1, set.new()),
+            )
           actor.continue(new_state)
         }
         False -> {
@@ -276,6 +285,26 @@ fn handle_lobby_msg(
         )
       actor.continue(new_info)
     }
+    PlayerCrashed(player_id) -> {
+      let assert Ok(player) =
+        state.players
+        |> set.to_list()
+        |> list.find(fn(p) { p.id == player_id })
+      case state.status {
+        Playing(round, dead_players) -> {
+          let new_dead_players = set.insert(dead_players, player)
+          let new_status = Playing(round, new_dead_players)
+          let new_info = LobbyInfo(..state, status: new_status)
+          let assert Ok(_) = case new_dead_players == state.players {
+            True ->
+              glubsub.broadcast(state.topic, GameLifecycleSharedMsg(RoundEnded))
+            False -> Ok(Nil)
+          }
+          actor.continue(new_info)
+        }
+        _ -> actor.continue(state)
+      }
+    }
     GetGameTopic(reply_with) -> {
       let topic = state.game_topic
       process.send(reply_with, topic)
@@ -329,6 +358,10 @@ pub fn exit_game(subject: Subject(LobbyMsg), player: Player) -> Nil {
   actor.send(subject, ExitGame(player))
 }
 
+pub fn player_crashed(subject: Subject(LobbyMsg), player_id: String) -> Nil {
+  actor.send(subject, PlayerCrashed(player_id))
+}
+
 pub fn get_game_topic(
   subject: Subject(LobbyMsg),
 ) -> glubsub.Topic(GameSharedMsg) {
@@ -341,6 +374,20 @@ pub fn get_lobby_info(subject: Subject(LobbyMsg)) -> LobbyInfo {
 
 pub fn close_lobby(subject: Subject(LobbyMsg)) -> Nil {
   actor.send(subject, CloseLobby)
+}
+
+pub fn mode_progress(lobby_info: LobbyInfo) -> String {
+  case lobby_info.status, lobby_info.settings.mode {
+    Playing(round, _dead), FirstToXPoints(points) ->
+      "Round "
+      <> int.to_string(round)
+      <> " - First to "
+      <> int.to_string(points)
+      <> " points"
+    Playing(round, _dead), HighestScoreAfterXRounds(rounds) ->
+      "Round " <> int.to_string(round) <> "/" <> int.to_string(rounds)
+    _, _ -> "N/A"
+  }
 }
 
 fn room_code() -> String {

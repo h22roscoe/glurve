@@ -27,5 +27,4 @@ pub type LobbySharedMsg {
 
 pub type GameLifecycleSharedMsg {
   RoundEnded
-  MatchEnded
 }

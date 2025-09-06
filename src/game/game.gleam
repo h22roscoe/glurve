@@ -322,6 +322,14 @@ fn broadcast(channel: glubsub.Topic(msg), msg: msg) -> Effect(any) {
   Nil
 }
 
+fn player_crashed_effect(
+  lobby_subject: actor.Started(process.Subject(LobbyMsg)),
+  player_id: String,
+) -> Effect(GameMsg) {
+  use _dispatch <- effect.from
+  lobby.player_crashed(lobby_subject.data, player_id)
+}
+
 fn handle_turn(
   players: dict.Dict(String, player.Player),
   player_id: String,
@@ -457,10 +465,13 @@ fn update(model: Model, msg: GameMsg) -> #(Model, Effect(GameMsg)) {
         )
         _ -> #(
           Model(..model, players: new_players_with_crashed, game_state: Crashed),
-          broadcast(
-            model.topic,
-            game_shared_message.PlayerCrashed(model.player_id),
-          ),
+          effect.batch([
+            player_crashed_effect(model.lobby_subject, model.player_id),
+            broadcast(
+              model.topic,
+              game_shared_message.PlayerCrashed(model.player_id),
+            ),
+          ]),
         )
       }
     }
